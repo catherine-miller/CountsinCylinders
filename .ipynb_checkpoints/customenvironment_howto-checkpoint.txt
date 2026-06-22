@@ -1,0 +1,15 @@
+
+Notes on how to build custom DESI environment using conda
+
+Followed the instructions given here: https://desi.lbl.gov/trac/wiki/Pipeline/GettingStarted/NERSC
+
+for adding future packages
+activate conda with 
+	mydesienv
+install your desired package
+	pip3 install <package name>
+add to package list under ~/conda/<package list name>
+
+for pycorr specifically
+	export USE_GPU = 0
+	python -m pip install git+https://github.com/cosmodesi/pycorr#egg=pycorr[corrfunc]

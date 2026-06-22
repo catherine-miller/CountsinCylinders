@@ -1,0 +1,26 @@
+Steps for matching number density
+1. Get hole locations from random catalogs
+        Holes for SV3: 
+            "datafiles/Holes_LRG_SV3_tile"+str(i)+"_holes.csv"
+            "datafiles/Holes_ELG_SV3_tile"+str(i)+"_holes.csv"
+        Holes for Abacus:     
+            spelg = Table.read("datafiles/forFAelg_tile"+str(i)+"_holes.csv",format = "csv")
+            splrg = Table.read("datafiles/forFAlrg_tile"+str(i)+"_holes.csv",format = "csv")
+2. Using CiC script, count the number of galaxies not within hole centers
+        SV3
+            file_elgS = '/global/cfs/cdirs/desi/vac/edr/lss/v2.0/LSScats/clustering/ELG_HIPnotqso_S_clustering.dat.fits'
+            file_elgN = '/global/cfs/cdirs/desi/vac/edr/lss/v2.0/LSScats/clustering/ELG_HIPnotqso_N_clustering.dat.fits'
+            file_lrgS = '/global/cfs/cdirs/desi/vac/edr/lss/v2.0/LSScats/clustering/LRG_main_S_clustering.dat.fits'
+            file_lrgN = '/global/cfs/cdirs/desi/vac/edr/lss/v2.0/LSScats/clustering/LRG_main_N_clustering.dat.fits'
+        Abacus
+            mockdir = "/global/cfs/cdirs/desi//survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit_v4_2/"
+            file = mockdir+ "forFA"+str(mocknumber)+".fits"
+        Abacus ELG: 332249 / 381064
+        Abacus LRG: 167450 / 189459 
+        SV3 ELG: 41421 / 46362
+        SV3 LRG: 28229 / 28229
+3. MC integrate to get the solid angle these galaxies come from
+4. Calculate number density
+5. Downsample Abacus as necessary
+6. Calculate number density again to check
+7. Calculate CiC moments

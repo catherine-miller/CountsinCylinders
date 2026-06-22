@@ -1,0 +1,18 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: 'ELG Order, LRG Order', datatype: string, subtype: 'int64[2]'}
+# - {name: Moment, datatype: float64}
+# - {name: Standard Error, datatype: float64}
+# meta: {name: Moments of ELG-centered bivariate counts in cylinders distribution}
+# schema: astropy-2.0
+"ELG Order, LRG Order" Moment "Standard Error"
+[0,1] 0.00012618362328546074 7.114874606526073e-08
+[0,2] 1.6912530125663664e-08 1.7064829165095466e-11
+[0,3] 2.3681459567180772e-12 3.257712601577991e-15
+[1,0] 0.0002182793385196733 4.152575448388218e-08
+[1,1] 2.7280352387578033e-08 1.3558537865284563e-11
+[1,2] 3.61954646285261e-12 3.25370852474315e-15
+[2,0] 4.785638109432564e-08 1.782222686168007e-11
+[2,1] 5.928296181144634e-12 3.0611946893917357e-15
+[3,0] 1.0535169861881036e-11 5.765528856214553e-15

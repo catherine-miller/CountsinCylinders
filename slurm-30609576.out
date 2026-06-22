@@ -1,0 +1,161 @@
+2024-09-18T12:32:26-07:00 LAUNCH
+[I 2024-09-18 12:32:31.418 ServerApp] Extension package dask_labextension took 1.7546s to import
+[W 2024-09-18 12:32:31.418 ServerApp] A `_jupyter_server_extension_points` function was not found in dask_labextension. Instead, a `_jupyter_server_extension_paths` function was found and will be used for now. This function name will be deprecated in future releases of Jupyter Server.
+[I 2024-09-18 12:32:31.632 ServerApp] Extension package jupyter_server_ydoc took 0.1261s to import
+[I 2024-09-18 12:32:32.945 ServerApp] Extension package jupyterlab_h5web took 1.0538s to import
+[I 2024-09-18 12:32:33.228 ServerApp] Extension package jupytext took 0.2714s to import
+[W 2024-09-18 12:32:33.237 ServerApp] A `_jupyter_server_extension_points` function was not found in nbclassic. Instead, a `_jupyter_server_extension_paths` function was found and will be used for now. This function name will be deprecated in future releases of Jupyter Server.
+[I 2024-09-18 12:32:33.520 ServerApp] Extension package webio_jupyter_extension.serverextension took 0.2800s to import
+[I 2024-09-18 12:32:33.521 ServerApp] dask_labextension | extension was successfully linked.
+[I 2024-09-18 12:32:33.521 ServerApp] jupyter_resource_usage | extension was successfully linked.
+[I 2024-09-18 12:32:33.527 ServerApp] jupyter_server_fileid | extension was successfully linked.
+[I 2024-09-18 12:32:33.532 ServerApp] jupyter_server_mathjax | extension was successfully linked.
+[I 2024-09-18 12:32:33.533 ServerApp] jupyter_server_proxy | extension was successfully linked.
+[I 2024-09-18 12:32:33.537 ServerApp] jupyter_server_terminals | extension was successfully linked.
+[I 2024-09-18 12:32:33.541 ServerApp] jupyter_server_ydoc | extension was successfully linked.
+[I 2024-09-18 12:32:33.542 JupyterHubSingleUser] Starting jupyterhub single-user server extension version 4.1.5
+[I 2024-09-18 12:32:33.542 JupyterHubSingleUser] Using default url from environment $JUPYTERHUB_DEFAULT_URL: /lab/tree/global/homes/c/crmiller
+[I 2024-09-18 12:32:33.545 ServerApp] jupyterhub | extension was successfully linked.
+[W 2024-09-18 12:32:33.548 LabApp] 'extra_template_paths' was found in both NotebookApp and ServerApp. This is likely a recent change. This config will only be set in NotebookApp. Please check if you should also config these traits in ServerApp for your purpose.
+[I 2024-09-18 12:32:33.551 ServerApp] jupyterlab | extension was successfully linked.
+[I 2024-09-18 12:32:33.551 ServerApp] jupyterlab_code_formatter | extension was successfully linked.
+[I 2024-09-18 12:32:33.551 ServerApp] jupyterlab_git | extension was successfully linked.
+[I 2024-09-18 12:32:33.552 ServerApp] jupyterlab_h5web | extension was successfully linked.
+[I 2024-09-18 12:32:33.552 ServerApp] jupyterlab_slurm | extension was successfully linked.
+[I 2024-09-18 12:32:33.552 ServerApp] jupytext | extension was successfully linked.
+[W 2024-09-18 12:32:33.556 NotebookApp] 'extra_template_paths' was found in both NotebookApp and ServerApp. This is likely a recent change. This config will only be set in NotebookApp. Please check if you should also config these traits in ServerApp for your purpose.
+[I 2024-09-18 12:32:33.558 ServerApp] nbclassic | extension was successfully linked.
+[I 2024-09-18 12:32:33.558 ServerApp] nbdime | extension was successfully linked.
+[I 2024-09-18 12:32:33.559 ServerApp] Writing Jupyter server cookie secret to /tmp/jupyter-runtime-13736924-2d29-4e51-8383-edad5d1cd9c1/jupyter_cookie_secret
+[I 2024-09-18 12:32:33.590 ServerApp] notebook_shim | extension was successfully linked.
+[I 2024-09-18 12:32:33.591 ServerApp] webio_jupyter_extension.serverextension | extension was successfully linked.
+/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server/serverapp.py:2236: JupyterServerAuthWarning: Core endpoints without @allow_unauthenticated, @ws_authenticated, nor @web.authenticated:
+- GET of JupyterHubLogoutHandler registered for /user/crmiller/perlmutter-shared-node-gpu/logout
+- GET of JupyterHubOAuthCallbackHandler registered for /user/crmiller/perlmutter-shared-node-gpu/oauth_callback
+  self.web_app = ServerWebApplication(
+[I 2024-09-18 12:32:33.691 ServerApp] notebook_shim | extension was successfully loaded.
+[I 2024-09-18 12:32:33.692 ServerApp] dask_labextension | extension was successfully loaded.
+[I 2024-09-18 12:32:33.693 ServerApp] jupyter_resource_usage | extension was successfully loaded.
+[I 2024-09-18 12:32:33.694 FileIdExtension] Configured File ID manager: ArbitraryFileIdManager
+[I 2024-09-18 12:32:33.694 FileIdExtension] ArbitraryFileIdManager : Configured root dir: /
+[I 2024-09-18 12:32:33.694 FileIdExtension] ArbitraryFileIdManager : Configured database path: /global/u1/c/crmiller/.local/share/jupyter/file_id_manager.db
+[I 2024-09-18 12:32:33.701 FileIdExtension] ArbitraryFileIdManager : Successfully connected to database file.
+[I 2024-09-18 12:32:33.701 FileIdExtension] ArbitraryFileIdManager : Creating File ID tables and indices with journal_mode = DELETE
+[I 2024-09-18 12:32:33.708 FileIdExtension] Attached event listeners.
+[I 2024-09-18 12:32:33.708 ServerApp] jupyter_server_fileid | extension was successfully loaded.
+[I 2024-09-18 12:32:33.709 ServerApp] jupyter_server_mathjax | extension was successfully loaded.
+[I 2024-09-18 12:32:33.755 ServerApp] jupyter_server_proxy | extension was successfully loaded.
+[I 2024-09-18 12:32:33.757 ServerApp] jupyter_server_terminals | extension was successfully loaded.
+[I 2024-09-18 12:32:33.757 ServerApp] jupyter_server_ydoc | extension was successfully loaded.
+[I 2024-09-18 12:32:33.766 JupyterHubSingleUser] Updating Hub with activity every 300 seconds
+[I 2024-09-18 12:32:33.766 ServerApp] jupyterhub | extension was successfully loaded.
+[I 2024-09-18 12:32:34.139 LabApp] JupyterLab extension loaded from /global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyterlab
+[I 2024-09-18 12:32:34.140 LabApp] JupyterLab application directory is /global/common/software/nersc9/jupyter/ex/24-05/share/jupyter/lab
+[I 2024-09-18 12:32:34.144 ServerApp] jupyterlab | extension was successfully loaded.
+[I 2024-09-18 12:32:34.145 ServerApp] Registered jupyterlab_code_formatter server extension
+[I 2024-09-18 12:32:34.145 ServerApp] jupyterlab_code_formatter | extension was successfully loaded.
+[I 2024-09-18 12:32:34.151 ServerApp] jupyterlab_git | extension was successfully loaded.
+[I 2024-09-18 12:32:34.277 ServerApp] Jupyterlab-h5web extension will serve HDF5 files from /
+[I 2024-09-18 12:32:34.277 ServerApp] jupyterlab_h5web | extension was successfully loaded.
+[I 2024-09-18 12:32:34.278 ServerApp] jupyterlab_slurm server extension loaded
+[I 2024-09-18 12:32:34.278 ServerApp] {'squeue_path': 'squeue', 'scancel_path': 'scancel', 'scontrol_path': 'scontrol', 'sbatch_path': 'sbatch'}
+[I 2024-09-18 12:32:34.278 ServerApp] {'log_function': <function log_request at 0x7fc7fcaae710>, 'base_url': '/user/crmiller/perlmutter-shared-node-gpu/', 'default_url': '/user/crmiller/perlmutter-shared-node-gpu/lab/tree/global/homes/c/crmiller', 'template_path': ['/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server', '/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server/templates'], 'static_path': ['/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server/static', '/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/nbclassic/static'], 'static_custom_path': ['/global/u1/c/crmiller/.jupyter/custom', '/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server/static/custom'], 'static_handler_class': <class 'jupyter_server.base.handlers.FileFindHandler'>, 'static_url_prefix': '/user/crmiller/perlmutter-shared-node-gpu/static/', 'static_handler_args': {'no_cache_paths': ['/user/crmiller/perlmutter-shared-node-gpu/static/custom'], 'path': ['/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server/static', '/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/nbclassic/static']}, 'version_hash': '20240918193233', 'kernel_ws_protocol': '', 'limit_rate': False, 'iopub_msg_rate_limit': 0.0, 'iopub_data_rate_limit': 0.0, 'rate_limit_window': 0.0, 'cookie_secret': b'\x8d\x02+\xd9\x97\xec\x9a\x1a\x1c|%\xd7\x07\xdc+6\x1e\x88\x8e\x90\x9dT\xc5h\xbcn,\x0e\xe3\xbe-\x7f', 'login_url': '/user/crmiller/perlmutter-shared-node-gpu/login', 'xsrf_cookies': False, 'disable_check_xsrf': False, 'allow_unauthenticated_access': True, 'allow_remote_access': True, 'local_hostnames': ['localhost'], 'authenticate_prometheus': True, 'kernel_manager': <jupyter_server.services.kernels.kernelmanager.AsyncMappingKernelManager object at 0x7fc6ef645a50>, 'contents_manager': <jupyter_server.services.contents.largefilemanager.AsyncLargeFileManager object at 0x7fc6ef6462c0>, 'session_manager': <jupyter_server.services.sessions.sessionmanager.SessionManager object at 0x7fc6ef6456c0>, 'kernel_spec_manager': <jupyter_client.kernelspec.KernelSpecManager object at 0x7fc6ef646200>, 'config_manager': <jupyter_server.services.config.manager.ConfigManager object at 0x7fc6ef645e40>, 'authorizer': <jupyter_server.auth.authorizer.AllowAllAuthorizer object at 0x7fc6ef645d50>, 'identity_provider': <jupyterhub.singleuser.extension.JupyterHubIdentityProvider object at 0x7fc6ef645780>, 'event_logger': <jupyter_events.logger.EventLogger object at 0x7fc7fefbe2c0>, 'kernel_websocket_connection_class': <class 'jupyter_server.services.kernels.connection.channels.ZMQChannelsWebsocketConnection'>, 'websocket_ping_interval': 0, 'websocket_ping_timeout': 0, 'extra_services': [], 'started': datetime.datetime(2024, 9, 18, 19, 32, 33, 621787, tzinfo=datetime.timezone.utc), 'last_activity_times': {}, 'jinja_template_vars': {'logo_url': '/hub/logo', 'hub_control_panel_url': '/hub/home'}, 'websocket_url': '', 'shutdown_button': False, 'config': {'KernelManager': {'transport': 'ipc'}, 'FileContentsManager': {'delete_to_trash': False}, 'NotebookApp': {'extra_template_paths': <LazyConfigValue value=['/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyterhub/singleuser/templates']>}, 'ServerApp': {'shutdown_no_activity_timeout': 64800, 'jpserver_extensions': <LazyConfigValue value={'jupyterhub': True, 'dask_labextension': True, 'jupyter_resource_usage': True, 'jupyter_server_fileid': True, 'jupyter_server_mathjax': True, 'jupyter_server_proxy': True, 'jupyter_server_terminals': True, 'jupyter_server_ydoc': True, 'jupyterlab': True, 'jupyterlab_code_formatter': True, 'jupyterlab_git': True, 'jupyterlab_h5web': True, 'jupyterlab_slurm': True, 'jupytext': True, 'nbclassic': True, 'nbdime': True, 'notebook_shim': True, 'webio_jupyter_extension.serverextension': True}>, 'identity_provider_class': <class 'jupyterhub.singleuser.extension.JupyterHubIdentityProvider'>, 'allow_remote_access': True, 'open_browser': False, 'trust_xheaders': True, 'quit_button': False, 'port_retries': 0, 'answer_yes': True, 'root_dir': '/', 'port': 51383, 'ip': '0.0.0.0', 'base_url': '/user/crmiller/perlmutter-shared-node-gpu/', 'default_url': '/lab/tree/global/homes/c/crmiller', 'keyfile': '', 'certfile': '', 'client_ca': '', 'file_url_prefix': 'notebooks'}, 'MappingKernelManager': {'cull_idle_timeout': 64800}, 'TerminalManager': {'cull_inactive_timeout': 64800}, 'ServerProxy': {'host_allowlist': <function host_allowlist at 0x7fc6ef455900>}, 'ContentsManager': {'allow_hidden': True}}, 'config_dir': '/global/u1/c/crmiller/.jupyter', 'allow_password_change': True, 'server_root_dir': '/', 'jinja2_env': <jinja2.environment.Environment object at 0x7fc6ef481480>, 'serverapp': <jupyter_server.serverapp.ServerApp object at 0x7fc7fcb1d450>, 'allow_origin': '', 'websocket_compression_options': None, 'allow_credentials': False, 'autoreload': False, 'cookie_options': {}, 'get_secure_cookie_kwargs': {}, 'token': '4753f49aca4e49e8afd221da3f422832', 'xsrf_cookie_kwargs': {'path': '/user/crmiller/perlmutter-shared-node-gpu/'}, 'jupyter_resource_usage_display_config': <jupyter_resource_usage.config.ResourceUseDisplay object at 0x7fc6ef528bb0>, 'jupyter_server_fileid_config': {'file_id_manager': None, 'file_id_manager_class': <class 'jupyter_server_fileid.manager.ArbitraryFileIdManager'>}, 'jupyter_server_fileid_static_paths': [], 'jupyter_server_fileid': <jupyter_server_fileid.extension.FileIdExtension object at 0x7fc6f07679d0>, 'file_id_manager': <jupyter_server_fileid.manager.ArbitraryFileIdManager object at 0x7fc6ef529150>, 'jupyter_server_mathjax_config': {'mathjax_config': 'TeX-AMS-MML_HTMLorMML-full,Safe'}, 'jupyter_server_mathjax_static_paths': ['/global/common/software/nersc9/jupyter/ex/24-05/lib/python3.10/site-packages/jupyter_server_mathjax/static'], 'jupyter_server_mathjax': <jupyter_server_mathjax.app.MathJaxExtension object at 0x7fc6f078d360>, 'mathjax_config': 'TeX-AMS-MML_HTMLorMML-full,Safe', 'mathjax_url': '/user/crmiller/perlmutter-shared-node-gpu/static/jupyter_server_mathjax/MathJax.js', 'jupyter_server_terminals_config': {'terminal_manager_class': <class 'jupyter_server_terminals.terminalmanager.TerminalManager'>}, 'jupyter_server_terminals_static_paths': [], 'jupyter_server_terminals': <jupyter_server_terminals.app.TerminalsExtensionApp object at 0x7fc6f078f2b0>, 'terminals_available': True, 'terminal_manager': <jupyter_server_terminals.terminalmanager.TerminalManager object at 0x7fc6ef529960>, 'jupyter_server_ydoc_config': {'document_cleanup_delay': 60, 'document_save_delay': 1.0, 'file_poll_interval': 1, 'ystore_class': <class 'jupyter_server_ydoc.handlers.SQLiteYStore'>}, 'jupyter_server_ydoc_static_paths': [], 'jupyter_server_ydoc': <jupyter_server_ydoc.app.YDocExtension object at 0x7fc6f078f7c0>, 'collaborative_file_poll_interval': 1, 'collaborative_document_cleanup_delay': 60, 'collaborative_document_save_delay': 1.0, 'collaborative_ystore_class': <class 'jupyter_server_ydoc.handlers.SQLiteYStore'>, 'jupyterhub-singleuser_config': {'_last_activity_sent': None, 'disable_user_config': True, 'hub_activity_interval': 300, 'hub_activity_url': 'https://jupyter.nersc.gov/hub/api/users/crmiller/activity', 'hub_auth': <jupyterhub.services.auth.HubOAuth object at 0x7fc6ef52a020>, 'hub_http_client': <tornado.simple_httpclient.SimpleAsyncHTTPClient object at 0x7fc6ef52a4a0>, 'server_name': 'perlmutter-shared-node-gpu'}, 'jupyterhub-singleuser_static_paths': [], 'jupyterhub-singleuser': <jupyterhub.singleuser.extension.JupyterHubSingleUser object at 0x7fc7fbd923b0>, 'page_config_hook': <bound method JupyterHubIdentityProvider.page_config_hook of <jupyterhub.singleuser.extension.JupyterHubIdentityProvider object at 0x7fc6ef645780>>, 'headers': {'X-JupyterHub-Version': '4.1.5', 'Content-Security-Policy': "frame-ancestors 'none'"}, 'lab_config': {'app_dir': '/global/common/software/nersc9/jupyter/ex/24-05/share/jupyter/lab', 'check_for_updates_class': <class 'jupyterlab.handlers.announcements.CheckForUpdate'>, 'collaborative': False, 'core_mode': False, 'default_url': '/lab', 'dev_mode': False, 'expose_app_in_browser': False, 'extensions_in_dev_mode': False, 'future_skip_styles_for_disabled': False, 'news_url': 'https://jupyterlab.github.io/assets/feed.xml', 'override_static_url': '', 'override_theme_url': '', 'splice_source': False, 'user_settings_dir': '/global/u1/c/crmiller/.jupyter/lab/user-settings', 'watch': False, 'workspaces_dir': '/global/u1/c/crmiller/.jupyter/lab/workspaces'}, 'lab_template_paths': ['/global/common/software/nersc9/jupyter/ex/24-05/share/jupyter/lab/static'], 'lab_jinja2_env': <jinja2.environment.Environment object at 0x7fc6ef52b850>, 'lab_static_paths': ['/global/common/software/nersc9/jupyter/ex/24-05/share/jupyter/lab/static'], 'lab': <jupyterlab.labapp.LabApp object at 0x7fc6f07cb130>, 'static_immutable_cache': ['/lab/extensions/@jupyter-server/resource-usage/static', '/lab/extensions/jupyterlab-jupytext/static', '/lab/extensions/spreadsheet-editor/static', '/lab/extensions/nersc-refresh-announcements/static', '/lab/extensions/jupyterlab-h5web/static', '/lab/extensions/@jlab-enhanced/recents/static', '/lab/extensions/webio-jupyterlab-provider/static', '/lab/extensions/@pyviz/jupyterlab_pyviz/static', '/lab/extensions/jupyterlab-slurm/static', '/lab/extensions/nbdime-jupyterlab/static', '/lab/extensions/jupyterlab_code_formatter/static', '/lab/extensions/@jupyter-widgets/jupyterlab-manager/static', '/lab/extensions/@axlair/jupyterlab_vim/static', '/lab/extensions/@jupyterlab/git/static', '/lab/extensions/jupyter-matplotlib/static', '/lab/extensions/@jlab-enhanced/favorites/static', '/lab/extensions/dask-labextension/static', '/lab/extensions/jupyterlab_pygments/static', '/user/crmiller/perlmutter-shared-node-gpu/static/lab/', '/lab/extensions/jupyterlab-nvdashboard/static', '/lab/extensions/jupyterlab-plotly/static', '/lab/extensions/@jupyterhub/jupyter-server-proxy/static', '/lab/extensions/additional-resources-menu/static'], 'page_config_data': {'buildAvailable': True, 'buildCheck': True, 'devMode': False, 'token': '4753f49aca4e49e8afd221da3f422832', 'exposeAppInBrowser': False, 'quitButton': False, 'collaborative': False, 'allow_hidden_files': True, 'futureSkipStylesForDisabled': False, 'notebookVersion': '[2, 14, 0]', 'news': {'disabled': False}}, 'git': <jupyterlab_git.git.Git object at 0x7fc6ef544760>, 'squeue_path': 'squeue', 'scancel_path': 'scancel', 'scontrol_path': 'scontrol', 'sbatch_path': 'sbatch'}
+[I 2024-09-18 12:32:34.279 ServerApp] Slurm command paths: 
+    squeue: squeue
+    scancel: scancel
+    scontrol: scontrol
+    sbatch: sbatch
+    
+[I 2024-09-18 12:32:34.279 ServerApp] Starting up handlers....
+    
+[I 2024-09-18 12:32:34.279 ServerApp] Handler: ExampleHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/get_example	dict: {'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.280 ServerApp] Handler: UserFetchHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/user	dict: {'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.280 ServerApp] Handler: SqueueHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/squeue	dict: {'squeue': 'squeue', 'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.280 ServerApp] Handler: ScancelHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/scancel	dict: {'scancel': 'scancel', 'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.280 ServerApp] Handler: ScontrolHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/scontrol/(?P<action>.*)	dict: {'scontrol': 'scontrol', 'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.281 ServerApp] Handler: SbatchHandler	URI: /user/crmiller/perlmutter-shared-node-gpu/jupyterlab_slurm/sbatch	dict: {'sbatch': 'sbatch', 'temporary_directory': None, 'log': <Logger ServerApp (DEBUG)>}
+    
+[I 2024-09-18 12:32:34.281 ServerApp] jupyterlab_slurm | extension was successfully loaded.
+[W 2024-09-18 12:32:34.282 ServerApp] [Jupytext Server Extension] Async contents managers like AsyncLargeFileManager are not supported at the moment (https://github.com/mwouts/jupytext/issues/1020). We will derive a contents manager from LargeFileManager instead.
+[I 2024-09-18 12:32:34.282 ServerApp] [Jupytext Server Extension] Deriving a JupytextContentsManager from LargeFileManager
+[I 2024-09-18 12:32:34.283 ServerApp] jupytext | extension was successfully loaded.
+[I 2024-09-18 12:32:34.306 ServerApp] nbclassic | extension was successfully loaded.
+[I 2024-09-18 12:32:34.525 ServerApp] nbdime | extension was successfully loaded.
+[I 2024-09-18 12:32:34.525 ServerApp] webio_jupyter_extension.serverextension | extension was successfully loaded.
+[I 2024-09-18 12:32:34.525 ServerApp] Will shut down after 64800 seconds with no kernels.
+[I 2024-09-18 12:32:34.526 ServerApp] Serving notebooks from local directory: /
+[I 2024-09-18 12:32:34.526 ServerApp] Jupyter Server 2.14.0 is running at:
+[I 2024-09-18 12:32:34.526 ServerApp] http://nid001013:51383/user/crmiller/perlmutter-shared-node-gpu/lab/tree/global/homes/c/crmiller?token=...
+[I 2024-09-18 12:32:34.526 ServerApp]     http://127.0.0.1:51383/user/crmiller/perlmutter-shared-node-gpu/lab/tree/global/homes/c/crmiller?token=...
+[I 2024-09-18 12:32:34.527 ServerApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[W 2024-09-18 12:33:15.119 LabApp] Could not determine jupyterlab build status without nodejs
+[I 2024-09-18 12:33:15.161 ServerApp] Loaded Jupytext configuration file at /global/common/software/nersc9/jupyter/ex/24-05/etc/jupytext/jupytext.toml
+[I 2024-09-18 12:33:15.172 ServerApp] UserFetchHandler.initialize()
+[I 2024-09-18 12:33:15.173 ServerApp] ExampleHandler.initialize()
+[I 2024-09-18 12:33:15.173 ServerApp] UserFetchHandler.get() crmiller
+[I 2024-09-18 12:33:15.174 ServerApp] ExampleHandler.get()
+WARNING:bokeh.server.util:Host wildcard '*' will allow connections originating from multiple (or possibly all) hostnames or IPs. Use non-wildcard values to restrict access explicitly
+[I 2024-09-18 12:33:33.781 ServerApp] Kernel started: 05cf9707-f79f-4134-9f3f-93628c35d9e1
+[I 2024-09-18 12:33:33.782 ServerApp] Culling kernels with idle durations > 64800 seconds at 300 second intervals ...
+
+Lmod is automatically replacing "gcc-native/12.3" with "gcc/11.2.0".
+
+
+Inactive Modules:
+  1) cray-libsci/23.12.5
+
+The following have been reloaded with a version change:
+  1) cray-mpich/8.1.28 => cray-mpich/8.1.25
+
+[W 2024-09-18 12:33:35.512 ServerApp] Could not destroy zmq context for <jupyter_client.asynchronous.client.AsyncKernelClient object at 0x7fc6ddc06d70>
+[I 2024-09-18 12:33:39.252 ServerApp] Connecting to kernel 05cf9707-f79f-4134-9f3f-93628c35d9e1.
+[I 2024-09-18 12:33:39.391 ServerApp] Starting buffering for 05cf9707-f79f-4134-9f3f-93628c35d9e1:6edf96e3-1fb3-446c-bf03-1d19875c231e
+[I 2024-09-18 12:33:39.469 ServerApp] Connecting to kernel 05cf9707-f79f-4134-9f3f-93628c35d9e1.
+[I 2024-09-18 12:33:39.771 ServerApp] Connecting to kernel 05cf9707-f79f-4134-9f3f-93628c35d9e1.
+[I 2024-09-18 12:39:35.951 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:39:35.977 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:41:36.219 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:41:36.246 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:47:38.943 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:47:38.970 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:51:40.946 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:51:40.974 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:53:43.591 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:53:43.617 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:55:43.846 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:55:43.872 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:57:44.106 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:57:44.131 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 12:59:44.406 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 12:59:44.431 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 13:01:09.157 ServerApp] Saving file at /global/homes/c/crmiller/CiCFirstSteps.ipynb
+[I 2024-09-18 13:01:09.181 ServerApp] Saving CiCFirstSteps.ipynb
+[I 2024-09-18 13:03:46.857 ServerApp] Kernel shutdown: 05cf9707-f79f-4134-9f3f-93628c35d9e1
+[I 2024-09-18 13:04:17.529 ServerApp] New terminal with automatic name: 1
+[I 2024-09-18 13:04:17.530 ServerApp] Culling terminals with inactivity > 64800 seconds at 300 second intervals ...
+[I 2024-09-18 13:04:47.521 ServerApp] Kernel started: 4b944758-4593-418f-81a9-c745a9c12553
+[W 2024-09-18 13:04:48.856 ServerApp] Could not destroy zmq context for <jupyter_client.asynchronous.client.AsyncKernelClient object at 0x7fc6dded3e20>
+[I 2024-09-18 13:04:51.539 ServerApp] Connecting to kernel 4b944758-4593-418f-81a9-c745a9c12553.
+[I 2024-09-18 13:04:51.767 ServerApp] Connecting to kernel 4b944758-4593-418f-81a9-c745a9c12553.
+[I 2024-09-18 13:04:51.992 ServerApp] Connecting to kernel 4b944758-4593-418f-81a9-c745a9c12553.
+[I 2024-09-18 13:04:52.280 ServerApp] Kernel started: e2af7c06-9d61-48d9-93db-bfb47520ffd9
+
+Lmod is automatically replacing "gcc-native/12.3" with "gcc/11.2.0".
+
+
+Inactive Modules:
+  1) cray-libsci/23.12.5
+
+The following have been reloaded with a version change:
+  1) cray-mpich/8.1.28 => cray-mpich/8.1.25
+
+[W 2024-09-18 13:04:53.629 ServerApp] Could not destroy zmq context for <jupyter_client.asynchronous.client.AsyncKernelClient object at 0x7fc6dde64cd0>
+[I 2024-09-18 13:04:57.420 ServerApp] Connecting to kernel e2af7c06-9d61-48d9-93db-bfb47520ffd9.
+[I 2024-09-18 13:05:12.096 ServerApp] Starting buffering for e2af7c06-9d61-48d9-93db-bfb47520ffd9:ff00483d-bb42-48d1-a292-baa36f8cbb5a
+[I 2024-09-18 13:05:12.115 ServerApp] Starting buffering for 4b944758-4593-418f-81a9-c745a9c12553:5532c45a-853f-460f-8836-34af164c7243
+slurmstepd: error: *** JOB 30609576 ON nid001013 CANCELLED AT 2024-09-18T20:05:30 ***
