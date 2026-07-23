@@ -6,7 +6,7 @@ from math import floor, log10
 class bootstrapCiCError:
     #makes histograms
     #bootstraps CiC error
-    def __init__(self,elgtables, lrgtables, binmax, weights = None):
+    def __init__(self,elgtables, lrgtables, binmax, weights = None, weights_err = None):
         '''
         Initializes bootstrapCiCerror class. Makes histograms of counts in cylinders for each of several samples.
         Combines these into one histogram and bootstraps error.
@@ -16,7 +16,14 @@ class bootstrapCiCError:
             elgtables: list of tables with ELG CiC counts
             lrgtables: list of tables with LRG CiC counts
             binmax: maximum number of counts in cylinders to consider
-            weights: list of elgelgweights, lrglrgweights, elglrgweights, lrgelgweights
+            weights: list of [elgelgweights, lrglrgweights, elglrgweights, lrgelgweights]
+            weights_err: list of [elgelgweights_err, lrglrgweights_err, elglrgweights_err, lrgelgweights_err],
+                uncertainties on each weight array. If provided, these are propagated into the
+                error arrays in quadrature with the sample variance. Defaults to zero arrays
+                (no weight uncertainty). Each weight error v_i affects only histogram bin i via
+                sigma_w[i] = histcomb[i] * (weights_err[i] / weights[i]).
+                For the bivariate histograms two independent weight errors contribute:
+                sigma_w[i,j] = histcomb[i,j] * sqrt((err_row[i]/w_row[i])^2 + (err_col[j]/w_col[j])^2).
         '''
         #make sure binmax is not greater than the length of the weights
         if weights is not None:
@@ -30,7 +37,7 @@ class bootstrapCiCError:
         bins = np.arange(-0.5,binmax+0.5,step=1)
 
         #make completeness weights
-        elgweights, lrgweights, elglrgweights, lrgelgweights = weights if weights != None else (None, None, None, None)
+        elgweights, lrgweights, elglrgweights, lrgelgweights = weights if weights is not None else (None, None, None, None)
         if elgweights is None:
             elgweights = np.repeat(1,binmax)
         if lrgweights is None:
@@ -39,6 +46,17 @@ class bootstrapCiCError:
             elglrgweights = np.repeat(1,binmax)
         if lrgelgweights is None:
             lrgelgweights = np.repeat(1,binmax)
+
+        elgweights_err, lrgweights_err, elglrgweights_err, lrgelgweights_err = \
+            weights_err if weights_err is not None else (None, None, None, None)
+        if elgweights_err is None:
+            elgweights_err = np.zeros(binmax)
+        if lrgweights_err is None:
+            lrgweights_err = np.zeros(binmax)
+        if elglrgweights_err is None:
+            elglrgweights_err = np.zeros(binmax)
+        if lrgelgweights_err is None:
+            lrgelgweights_err = np.zeros(binmax)
 
         multitracerweights_elg = np.outer(elglrgweights,elgweights)
         multitracerweights_lrg = np.outer(lrgweights,lrgelgweights)
@@ -116,6 +134,26 @@ class bootstrapCiCError:
         self.elgbivariate = elgbivariatesum/ntables
         self.lrgbivariate = lrgbivariatesum/ntables
 
+        # Propagate weight uncertainties into histogram errors.
+        # For a histogram bin weighted by w[i], sigma_hist = hist * (sigma_w / w).
+        # For a 2D bin weighted by w_row[j] * w_col[k], relative errors add in quadrature.
+        elg_rel_err = np.where(elgweights != 0, elgweights_err / elgweights, 0.0)
+        lrg_rel_err = np.where(lrgweights != 0, lrgweights_err / lrgweights, 0.0)
+        elglrg_rel_err = np.where(elglrgweights != 0, elglrgweights_err / elglrgweights, 0.0)
+        lrgelg_rel_err = np.where(lrgelgweights != 0, lrgelgweights_err / lrgelgweights, 0.0)
+
+        self.elg_CiCerr = np.sqrt(np.array(self.elg_CiCerr)**2 + (self.elghistcomb * elg_rel_err)**2)
+        self.lrg_CiCerr = np.sqrt(np.array(self.lrg_CiCerr)**2 + (self.lrghistcomb * lrg_rel_err)**2)
+        self.elglrg_CiCerr = np.sqrt(np.array(self.elglrg_CiCerr)**2 + (self.elglrghistcomb * elglrg_rel_err)**2)
+        self.lrgelg_CiCerr = np.sqrt(np.array(self.lrgelg_CiCerr)**2 + (self.lrgelghistcomb * lrgelg_rel_err)**2)
+
+        elgbivariate_weight_err = self.elgbivariate * np.sqrt(
+            elglrg_rel_err[:, np.newaxis]**2 + elg_rel_err[np.newaxis, :]**2)
+        lrgbivariate_weight_err = self.lrgbivariate * np.sqrt(
+            lrg_rel_err[:, np.newaxis]**2 + lrgelg_rel_err[np.newaxis, :]**2)
+        self.elgmultitracer_CiCerr = np.sqrt(np.array(self.elgmultitracer_CiCerr)**2 + elgbivariate_weight_err**2)
+        self.lrgmultitracer_CiCerr = np.sqrt(np.array(self.lrgmultitracer_CiCerr)**2 + lrgbivariate_weight_err**2)
+
         self.elghist = elghist
         self.lrghist = lrghist
         self.elglrghist = elglrghist
@@ -129,13 +167,42 @@ class bootstrapCiCError:
                                                   density=True,bins=bins) for i in range(ntables)],dtype='object')'''
 
 def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xranges = [5,5,5,5],weights=[None,None],plot_unweighted=False,staroffset=0):
+    """Plot and save side-by-side comparison of two CiC distributions.
+
+    Builds bootstrapCiCError objects for both catalogs, then produces two figures:
+    a 1D figure comparing all four 1D CiC histograms with ratio panels, and a
+    bivariate figure showing ELG- and LRG-centered 2D distributions as log-ratio
+    color maps with per-cell uncertainty annotations.
+
+    Parameters
+    ----------
+    cat1, cat2 : tuple
+        Argument tuples forwarded to bootstrapCiCError for each catalog.
+    name1, name2 : str
+        Legend labels for the two catalogs.
+    binmax : int
+        Maximum count bin passed to bootstrapCiCError.
+    figdir : str
+        Directory where output figures are saved.
+    figtag : str
+        String appended to output figure filenames.
+    xranges : list of int, optional
+        Display x-range for each of the four 1D histogram panels.
+    weights : list of two weight tuples, optional
+        Completeness weights for each catalog, passed to bootstrapCiCError.
+    plot_unweighted : bool, optional
+        If True, also build unweighted catalogs and overlay them on the ratio panels.
+    staroffset : float, optional
+        Coordinate offset for significance-star annotations in bivariate panels.
+    """
     fontsize = 15
     titlesize = 20
     catalog1 = bootstrapCiCError(*cat1,binmax,weights=weights[0])
     catalog2 = bootstrapCiCError(*cat2,binmax,weights=weights[1])
 
-    catalog_unweighted1 = bootstrapCiCError(*cat1,binmax)
-    catalog_unweighted2 = bootstrapCiCError(*cat2,binmax)
+    if plot_unweighted:
+        catalog_unweighted1 = bootstrapCiCError(*cat1,binmax)
+        catalog_unweighted2 = bootstrapCiCError(*cat2,binmax)
     cmap = 'RdYlBu_r'
     bins = np.arange(-0.5,binmax+0.5,step=1)
     
@@ -265,10 +332,10 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
     #lrgerr = np.ndenumerate([[catalog1.lrgmultitracer_CiCerr[i][j]/hist2[i][j] for j in range(maxcounts+1)]
                                   #for i in range(maxcounts+1)])
     for (i, j), z in np.ndenumerate(np.exp(diff[:maxcounts+1,:maxcounts+1])):
-        errtoprint = np.sqrt((catalog1.lrgmultitracer_CiCerr[i][j]/hist1[i][j])**2 + (catalog2.lrgmultitracer_CiCerr[i][j]/hist2[i][j])**2)*hist1[i][j]/hist2[i][j]
-        if np.abs(1 - z) > 2*errtoprint:
-            ax[1].text(j+staroffset,i+staroffset,"*",color='black',size=14,path_effects=[pe.withStroke(linewidth=2, foreground="white")],weight = 600)
-        if z > 0 and (hist2[i][j] != 0):
+        if z > 0 and (hist2[i][j] != 0) and (hist1[i][j] != 0):
+            errtoprint = np.sqrt((catalog1.lrgmultitracer_CiCerr[i][j]/hist1[i][j])**2 + (catalog2.lrgmultitracer_CiCerr[i][j]/hist2[i][j])**2)*hist1[i][j]/hist2[i][j]
+            if np.abs(1 - z) > 2*errtoprint:
+                ax[1].text(j+staroffset,i+staroffset,"*",color='black',size=14,path_effects=[pe.withStroke(linewidth=2, foreground="white")],weight = 600)
             ax[1].text((j+0.1)-0.5, (i+0.1)-0.5, '{:.2g}'.format(z)+" \n"+r" $\pm$ "+'{:g}'.format(round_to_2(errtoprint)), ha='left', va='bottom',
                     color='black',path_effects=[pe.withStroke(linewidth=2, foreground="white")],weight=600)
             '''if z < errtoprint:
@@ -281,27 +348,25 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
     fig.savefig(figdir+"Bivariate"+figtag+".png")
     
 
-    def getnZ(table,solidangle,zlim,nbins,zname = "Z"):
-        bins = np.linspace(*zlim,num=nbins)
-        hist, bins = np.histogram(table[zname],bins)
-        nz = []
-        for i in range(len(bins)-1):
-            d1 = cosmo.comoving_distance(bins[i+1])/u.Mpc
-            d2 = cosmo.comoving_distance(bins[i])/u.Mpc
-            v = 1/3*solidangle*(d1**3-d2**3)
-            nz.append(hist[i]/v/cosmo.h**3)
-        return nz,bins
+def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
+    """Plot the bin-by-bin ratio of two CiC distributions using jackknife errors.
 
+    Computes the ratio of catalog2 to catalog1 for each of the four 1D tracer
+    combinations (ELG-ELG, LRG-LRG, ELG-LRG, LRG-ELG). Errors are estimated
+    via a leave-one-out jackknife over the subsample tables. The ratio plotted
+    is catalog2 / catalog1.
 
-    '''
-        self.elghistcomb = elghistsum/ntables
-        self.lrghistcomb = lrghistsum/ntables
-        self.elglrghistcomb = elglrghistsum/ntables
-        self.lrgelghistcomb = lrgelghistsum/ntables
-        self.elgbivariate = elgbivariatesum/ntables
-        self.lrgbivariate = lrgbivariatesum/ntables
-'''
-def plotCiCRatio(cat1,cat2,name="",title='',plot=True): #ratio of catalog 2 to catalog1
+    Parameters
+    ----------
+    cat1, cat2 : bootstrapCiCError
+        Pre-built catalog objects.
+    name : str, optional
+        Label appended to the plot title.
+    title : str, optional
+        Additional plot title text.
+    plot : bool, optional
+        If True, draw the ratio curves on the current axes.
+    """
     titlesize=15
     textsize=15
     def getHist(catalog,tracers):

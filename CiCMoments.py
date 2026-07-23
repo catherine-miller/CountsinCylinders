@@ -539,35 +539,42 @@ def avgnpcf(tab_ntilde_dat,tab_ntilde_ran,tab_nz,tab_vcyl):
                                          +(tab_nz["Standard Error"]/tab_nz["Moment"])**2)
     return tab_npcf
 
-def formatMoment(table, index, scientific = False):
+def formatMoment(table, index, scientific=False):
     """Format a moment value and its error as a compact string for LaTeX tables.
 
     Args:
         table: Astropy Table with "Moment" and "Standard Error" columns.
         index: Row index of the moment to format.
-        scientific: If True, use scientific notation (e.g. "1.23e-04 +/- 4.5e-05").
-            If False, use compact notation where the error in the last digits is shown
-            in parentheses (e.g. "0.0123 (45)").
+        scientific: If True, use explicit notation "1.23e-04 $\\pm$ 4.5e-05".
+            If False, always show 3 significant figures of the moment with the
+            error in parentheses denoting uncertainty in the last displayed digit
+            (e.g. 0.501 +/- 0.003 becomes "0.501 (3)"). Uses scientific notation
+            internally when the moment magnitude is >= 1000 or < 0.01; otherwise
+            uses decimal with trailing zeros preserved.
 
     Returns:
         Formatted string suitable for embedding in a LaTeX table cell.
     """
     m = table["Moment"][index]
     err = table["Standard Error"][index]
-    string = ''
+
     if scientific:
-        string += f"{m:.2e} "+r"$\pm$"+f" {err:.1e}"
+        return f"{m:.2e} " + r"$\pm$" + f" {err:.1e}"
+
+    if m == 0:
+        return "0.00 (0)"
+
+    exponent = int(np.floor(np.log10(abs(m))))
+
+    if exponent >= 3 or exponent <= -3:
+        moment_str = f"{m:.2e}"
+        err_in_last = round(err / 10.0 ** (exponent - 2))
     else:
-        lastorder = int(np.log10(m))-2
-        errfloat = np.round(err, -lastorder)
-        errstring = str(errfloat).lstrip('0.')
-        if lastorder > -4 and lastorder < 0:
-            string += f"{m:.3g} ("+errstring+")"
-        elif lastorder >= 0:
-            string += f"{m:.3g} ("+errstring[:3]+")"
-        else:
-            string += f"{m:.2e} ("+errstring+")"
-    return string
+        decimals = 2 - exponent
+        moment_str = f"{m:.{decimals}f}"
+        err_in_last = round(err * 10.0 ** decimals)
+
+    return moment_str + " (" + str(err_in_last) + ")"
 
 def printMomentTableLaTeX(table,captiontxt,lrg = False,scientific = False):
     """Generate a LaTeX table string for a moment table with up to order 3 in each axis.
@@ -625,6 +632,11 @@ def printCiCTableLaTeX(hist,captiontxt,lrg = False,scientific = False):
     Returns:
         LaTeX string containing the full table environment.
     """
+    #so hacky but whatever
+        if lrg:
+            ix = [3,6,8,0,4,7,1,5,2]
+        else:
+            ix = np.arange(9)
     string = r'''
     \begin{table}
     \caption{''' + captiontxt + r'''}
