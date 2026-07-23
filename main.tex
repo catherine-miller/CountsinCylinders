@@ -1,0 +1,568 @@
+\documentclass[fleqn,usenatbib]{mnras}
+\usepackage{newtxtext,newtxmath}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{comment}
+\usepackage{breqn}
+\usepackage{newtxmath}
+\usepackage{geometry}
+\geometry{margin=0.5in}
+\usepackage{xcolor}
+\usepackage{array,multirow,graphicx}
+\usepackage{float}
+%\usepackage[
+%backend=biber,
+%style=numeric,
+%sorting=none
+%]{biblatex}
+\usepackage{gensymb}
+%\addbibresource{CiCrefs.bib}
+\newcommand*{\Comb}[2]{{}^{#1}C_{#2}}%
+
+
+\title{Multi-Tracer Counts in Cylinders in the DESI One-Percent Survey and Mock Catalogs}
+\author[Miller and Eisenstein]{
+Catherine R. Miller,$^{1}$\thanks{E-mail: catherine.miller@cfa.harvard.edu)}
+Daniel J. Eisenstein$^{2}$ \\
+$^{1}$Harvard University Department of Physics, 17 Oxford Street, Cambridge, Massachusetts 02138, U.S.A.\\
+$^{2}$Center for Astrophysics $\vert$ Harvard \& Smithsonian, 60 Garden Street, Cambridge, Massachusetts 02138, U.S.A.\\}
+\date{Accepted XXX. Received YYY; in original form ZZZ}
+
+% Prints the current year, for the copyright statements etc. To achieve a fixed year, replace the expression with a number. 
+\pubyear{\the\year{}}
+
+\begin{document}
+\label{firstpage}
+\pagerange{\pageref{firstpage}--\pageref{lastpage}}
+\maketitle
+\begin{abstract}
+We present a measurement of the multi-tracer galaxy counts-in-cylinders distribution in the DESI Survey Validation 3 dataset and compare this measurement to several AbacusSummit mock catalogs. The counts in cylinders, defined as the number of neighbors in a cylindrical region centered around a galaxy with axis along the line of sight, provides a powerful compression of galaxy clustering information at small scales, where clustering is highly skewed, because it is sensitive to higher-order correlations. If we define a cylinder radius around 1 Mpc, which coincides with the scale of a dark matter halo and the scale of the DESI fiber patrol region around z = 0.85, the counts in cylinders offers a means of evaluating the fidelity of mock catalogs at scales relevant to the halo occupation distribution and to fiber collisions. Further, we study two tracer populations, Emission-Line Galaxies (ELGs) and Luminous Red Galaxies (LRG); in this way we can evaluate the performance of mock catalogs in describing the effects of galaxy conformity. We find that while in most populations considered the mean counts in cylinders is consistent between the SV3 dataset and mock catalogs, the mock catalogs underestimate the high-multiplicity tail of the counts in cylinders distribution as well as higher-order moments, demonstrating the power of this statistic in validating mock catalogs.
+\end{abstract}
+\section*{Introduction}
+Galaxy clustering, or the three-dimensional spatial distribution of galaxies, is an observable that can powerfully constrain cosmological models. In the standard model of cosmology, galaxies inhabit dark matter halos and thus act as tracers of dark matter structure. Generally, a cosmological model makes predictions of dark matter clustering, and with some theory of the connection between galaxies and dark matter halos, we may relate cosmological theory to the observed galaxy clustering.
+
+Measurements of small-scale clustering (in this work meaning comparable to the scale of a dark matter halo, or $\sim$1 Mpc) are particularly interesting because, for the same sky volume, they generically contain more information than large-scale clustering measurements; however, it is difficult analytically to predict clustering from theory at these scales because dark matter structure becomes highly collapsed and nonlinear. Therefore, cosmologists often turn to $n$-body simulations to predict dark matter clustering at small scales (model prediction).
+
+In order to relate these simulations to observation, we need a theory of the galaxy-halo connection. While at large scales, the galaxy density distribution traces the dark matter density distribution scaled by some linear bias, at smaller scales the bias relationship becomes non-linear. Additionally, at these scales, properties of dark matter halos other than their mass may become important in predicting clustering, such as the accretion history of the halo (assembly bias) and the type of other galaxies in the halo (galaxy-galaxy conformity). Some simulations, such as those considered in this work, probabilistically assign central and satellite galaxies to dark matter halos based on the halo mass (and sometimes other properties) according to an empirically derived probability distribution called the halo occupation distribution (HOD).
+
+It is desirable to compare such simulations to observed galaxy clustering in order to determine whether they accurately reproduce clustering at small scales. One prevalent summary statistic used to quantify galaxy clustering is the two-point correlation function; to capture higher-order correlations, one can generalize this statistic and define $n$-point correlation functions. However, a statistical description of clustering in terms of $n$-point correlation functions becomes unwieldy at the halo scale, where the galaxy density field becomes highly skew, and higher-order correlation functions become large. While the two-point correlation function does not capture this skewness, higher-order correlation functions are cumbersome in their high dimensionality. 
+
+Counts-in-cells statistics, defined as the average count of galaxies in a volume around some central point, offer an alternative means of quantifying galaxy clustering at small scales.  Counts-in-cells statistics have historically been used to constrain the relationship between higher- and lower-order correlation functions \citep{fry_statistical_1978, balian_galaxies_1988, alimi_nonlinear_1990, gaztanaga_high-order_1994, colombi_count_nodate, szapudi_higher_2002} and the halo occupation distribution \citep{blanton_scale_2006, oguri_inferring_2015, reid_constraining_2009, wang_evidence_2022}. They can also constrain assembly bias \citep{pearl_desi_2023}. Because the counts-in-cells distribution is sensitive to higher-point correlation functions \citep{peebles_large-scale_1980}, it provides a meaningful compression of clustering information.
+
+We advance a method for evaluating small-scale clustering using counts in cylinders, a counts-in-cells statistic. We define the \textit{galaxy-centered counts in cylinders}: the number of neighbors, called \textit{secondaries}, counted in a cylinder formed around a central galaxy, called the \textit{primary}. The cylinder axis extends along the line of sight and is longer than the radius in order to account for redshift space distortions. The primary and secondary may belong to the same tracer population, or they may belong to different tracer populations; in this way we study auto- and cross-correlations.
+The Dark Energy Spectroscopic Instrument (DESI) is a fiber-fed, multi-object spectrograph which has recently completed a five-year survey of 63 million galaxies and quasars over 17,000 square degrees on sky \citep{DESI2022.KP1.Instr,Corrector.Miller.2023, DESI2016b.Instr,Spectro.Pipeline.Guy.2023,SurveyOps.Schlafly.2023,DESI2024.I.DR1,DESI2024.VII.KP7B,DESI.DR2.DR2}.
+We compute counts in cylinders in the DESI Survey Validation 3 (SV3) dataset and several AbacusSummit mock catalogs for two tracer populations: Emission Line Galaxies (ELGs) and Luminous Red Galaxies (LRGs). The SV3 dataset, also known as the One-Percent Survey, is the final stage of DESI survey validation, covering 197 square degrees on the sky \citep{collaboration_early_2024} or approximately 1\% of the sky area of the main survey, and was selected because it has high fiber completeness. DESI positions its fibers on target galaxies in the focal plane by means of robotic dual-axis rotating fiber positioners, each of which has a 4.75 mm range of motion, called the fiber patrol radius, corresponding to 0.05$\degree$ on the sky \citep{poppett_overview_2024}. The finite patrol radius limits the number of targets DESI can observe in a given angular area, leading to a phenomenon known as fiber incompleteness, in which some objects highly concentrated in a small angular area are not observed. However, this incompleteness is low in SV3 because many passes were completed over its small area. It is important to select a highly complete catalog because incompleteness would suppress the high-multiplicity tail of the counts-in-cylinders distribution. 
+
+AbacusSummit is a software suite of N-body simulations which generate dark matter halo lightcones \citep{hadzhiyska_halo_2022}. These halos are then populated with galaxies according to a halo occupation distribution using a second software suite, AbacusHOD \citep{yuan_abacushod_2022}, to generate the Abacus mock galaxy catalogs. This HOD was tuned to match the ELG and LRG two-point auto-correlation functions in SV3 and Abacus \citep{rocher_desi_2024}. We wish to compare small-scale clustering these catalogs to the SV3 dataset to evaluate their accuracy.
+
+The counts-in-cylinders distribution presents a desirable metric for evaluating the fidelity of small-scale clustering in mock catalogs for two reasons. First, if one defines a cylinder radius corresponding to the scale of a dark matter halo, the counts-in-cylinders distribution may constrain the HOD and assembly bias models. If we consider the bivariate counts-in-cylinders distribution, or the counts of both ELG and LRG secondaries around the same primaries, we may also use counts in cylinders to constrain galaxy-galaxy conformity. Second, if one defines a cylinder radius around the scale of the fiber patrol radius at a certain redshift, the counts-in-cylinders distribution is relevant to fiber collisions. In order to make accurate cosmological inference based on galaxy catalogs, DESI must understand the effects of fiber incompleteness. One method of doing so involves forward-modeling this incompleteness by generating mock catalogs and running a fiber assignment algorithm on them \citep{bianchi_characterization_2025}. However, in order to accurately estimate the effects of fiber collisions, these mock catalogs must faithfully represent clustering on the scale of the fiber patrol radius (0.05$\degree$). By comparing the counts in cylinders distributions between mock catalogs and highly complete survey catalogs, we can determine whether the mocks are appropriate for this forward modeling. Further, because DESI assigns target priorities based on tracer type, the bivariate counts in cylinders offers pertinent information. These two scales, the halo scale and the patrol radius scale, coincide at 1 Mpc (at z = 0.8). Therefore, we choose a cylinder radius $R_{\text{CiC}}$ = 1 Mpc.
+
+It is well-documented fact that the $n$th moment of the galaxy-centered counts in cylinders distribution is related to the cylinder average of the $(n+1)$-point correlation function. To take the first-order example, the mean counts in cylinders is the cylinder average of the two-point correlation function, plus the product of the number density and the cylinder volume; the mean counts in cylinders corresponds to the familiar data-data counts in the Hewett correlation function estimator
+\begin{equation}
+\xi = \frac{DD - DR}{DR}
+\end{equation}
+Therefore, if the two-point correlation function in a mock catalog is tuned to match survey data, and the number densities of the two catalogs also match, we expect the mean counts in cylinders to match. However, differences in higher-order correlation functions may lead to discrepancies in higher-order moments of the counts-in-cylinders distribution. The moments of the counts-in-cylinders distribution therefore present a useful metric for evaluating the skewness of galaxy bias at small scales.
+
+In this work, we compare the bivariate counts-in-cylinders distributions and their moments in SV3 and the Abacus mock catalogs. We generalize the relationship between the moments of the counts in cylinders distribution and correlation functions to the bivariate counts-in-cylinders distribution. Further, we manipulate the moments of the counts-in-cylinders distribution to produce a formula for the cylinder average of the $n$th order correlation function, and we calculate this statistic in both SV3 and the mock catalogs.
+
+
+\section*{Methods}
+\subsection*{Counts in Cylinders Definition}
+To compute the counts in cylinders in a galaxy catalog, we select a population of primary galaxies: either ELGs or LRGs. We form a cylindrical region of radius $R_{CiC}$ and height $2L_{CiC}$ centered on each primary, with axis along the line of sight. We count the number of ELG secondaries and LRG secondaries falling within this cylinder, computing real-space distances using the Planck 2018 cosmology. The bivariate distribution $P(N_{\text{ELG}},N_{\text{LRG}})$ of the ELG counts and LRG counts is the counts-in-cylinders distribution.
+
+We choose $R_{\text{CiC}} = 1$ Mpc, which corresponds to the angular scale of the fiber patrol radius (0.05$\degree$) at $z = 0.8$, and we choose $L_{\text{CiC}} = 40$ Mpc to account for redshift space distortions.
+\subsection*{Sample Selection}
+We make several cuts to our samples of primary galaxies to ensure we consider complete regions that do not overlap with the survey boundaries (secondaries are not subject to these cuts, so that the effective boundary of our sample is extended by $R_{\text{CiC}}$ transverse to the line of sight and $L_{\text{CiC}}$ along the line of sight).
+\begin{enumerate}
+\item Redshift: We select a redshift range $0.8 < z < 1$, where $n(z)$ is reasonably high for both ELGs and LRGs.
+\item Survey boundaries: The footprint of SV3 consists of 20 circular regions, called rosettes, of angular radius $1.5 \degree$. We require of the angle from the center of the rosette $0.2\degree< \theta < 1.5\degree$. The Abacus mock catalogs have the footprint of the main survey. We choose a rectangular region within the survey boundary $158 \degree < \text{RA} < 185\degree$, $2\degree<\text{DEC}< 27\degree$.
+\item Number density: In order to match number density between the SV3 sample and the Abacus catalogs, we downsample the Abacus number density to match the number density of the SV3 sample. This downsampling factor is 81\% for ELGs and 100\% for LRGs.
+\item Hole cleaning: Both the mock catalogs and the SV3 catalog are subject to several imaging masks, which leave small holes in the catalog. We implement a cleaning algorithm to eliminate primary galaxies near these holes.
+\begin{figure}
+\includegraphics[scale=0.5]{CiCfigs/numberdensity.png}
+\caption{ELG and LRG number density in the redshift range $0.8 < z < 1$, in both SV3 and the Abacus mock catalogs. This redshift range was selected so that the number density of both tracers was reasonably high.}
+\end{figure}
+\end{enumerate}
+\subsection*{Hole Cleaning Algorithm}
+To identify holes, we use random catalogs subject to the same imaging mask applied to the mock and SV3 catalogs, and search these catalogs for empty regions:
+\begin{enumerate}
+\item  We combine 18 random catalogs.
+\item We cover the survey footprint with candidate hole centers with pitch 0.008$\degree$ (smaller than the fiber patrol radius, 0.05$\degree$). 
+\item In the combined random catalogs, we search for galaxies within a 0.008$\degree$ radius around these candidate hole centers. Assuming the probability of finding $N$ galaxies within this area is a Poisson distribution, the probability of counting 0 galaxies is 0.11$\%$. If we count 0 galaxies, we declare the point a hole center.
+\item We exclude primary galaxies within 0.03$\degree$ from hole centers.
+\end{enumerate}
+\subsection*{Incompletness in SV3 Catalog}
+The DESI survey suffers from two sources of incompleteness which may affect the counts-in-cylinders measurement: fiber incompleteness and imaging masks. To determine how these sources of incompleteness affect our measurement in SV3, we calculate counts in cylinders in mock catalogs with and without these effects applied. We then implement means of completeness correction for each of these effects.
+
+To estimate the fiber completeness of SV3, 25 mock catalogs with the footprint of SV3 provide a set of fiducial catalogs. The DESI fiber assignment algorithm is applied to these catalogs to produce mock catalogs with fiber incompleteness that is comparable to SV3. We compute counts in cylinders in these two catalogs for both ELGs and LRGs according to the method described (Figure ~\ref{fig:sv3inc}). We find the number of cylinders with three and four galaxies decreases by several percent, and this incompleteness is greater for ELGs (which are lower priority targets).
+
+In order to correct for this fiber incompleteness, we simply multiply the counts in cylinders by the inverse of the incompleteness ratio $I \equiv \frac{P_{\mathrm{inc, SV3}}}{P_{\mathrm{SV3}}}$.\footnote{At this point, why not use main survey data rather than SV3, since the advantage of SV3 was that it is more complete? See Figure [X]; the incompleteness in the main survey is so great that we learn very little at all about galaxies with three and four neighbors.}
+
+
+\begin{figure}
+\includegraphics[scale=0.5]{CiCfigs/forpaper/ratiosv3inc.png}
+\caption{Counts in cylinders in SV3 mock catalogs with and without fiber incompleteness. The ratio of the count probability in the incomplete mocks to the count probability in the complete mocks is shown. The simulated fiber incompleteness affects the counts in cylinders significantly for galaxies with three or four neighbors, and the effect is greater for ELGs than LRGs.}
+\label{fig:sv3inc}
+\end{figure}
+\begin{figure}
+\includegraphics[scale=0.5]{CiCfigs/forpaper/ratioabinc.png}
+\label{fig:abacusinc}
+\caption{Counts in cylinders in mock catalogs with and without fiber assignment applied. The ratio of the count probability in the incomplete mocks to the count probability in the complete mocks is shown. Fiber incompleteness majorly affects the counts-in-cylinders measurement, especially at high count multiplicity. For this reason, a counts-in-cylinders study in the main survey would need to account for fiber incompleteness.}
+\end{figure}
+
+In order to see how incompleteness would affect a counts-in-cylinders measurement in the main survey, we carry out the same procedure on mock catalogs with the footprint and number of passes corresponding to main survey. We compare a set of complete Abacus mock catalogs to a set of mock catalogs with simulated fiber assignment applied \citep{bianchi_characterization_2025}. The fiber assignment majorly affects the counts in cylinders distribution, especially at high multiplicity (Figure ~\ref{fig:abacusinc}). For this reason, any counts-in-cylinders measurement in the main survey would need a means of correcting for fiber incompleteness more sophisticated than multiplying by the inverse of the incompleteness ratio.
+
+
+
+Second, it is necessary to demonstrate that the holes created by the imaging mask do not affect the counts-in-cylinders measurement. To do so, we examine three mock catalogs: one which does not have any imaging masks applied, one which does have imaging masks, and one which has imaging masks applied but on which counts in cylinders are computed with the hole-cleaning algorithm. The counts in cylinders decrease by up to 5\% when the imaging mask is applied, but after the hole-cleaning algorithm is applied, the counts in catalogs with masks applied and counts in catalogs with no masks are consistent within 1\%.
+\begin{figure}
+\includegraphics[scale=0.5]{CiCfigs/holecleaning.png}
+\caption{Ratio of counts in cylinders in mocks with holes (DESI imaging masks applied) to mocks without holes. Two galaxy samples in the mocks with holes are considered: one consisting of all galaxies, and one which excludes primaries within 0.08$\degree$ of the hole centers ("hole cleaning"). The counts in cylinders in the cleaned sample is close to the counts in cylinders in the catalog with no imaging mask applied.}
+\end{figure}
+
+\subsection*{Moments of Counts-in-Cylinders Distribution and Correlation Functions}
+We seek to relate the counts-in-cylinders distribution to a more familiar statistic, the $n$-point correlation function (or the $(n,m)$-point cross-correlation function). As stated previously, the $n$th moment of the counts-in-cylinders distribution is related to the cylinder average of the $(n+1)$-point correlation function. In Appendix A we derive this relationship and generalize it to the bivariate counts-in-cylinders distribution.
+
+In this section we present a means of combining moments of the counts-in-cylinders distribution to obtain a cylinder average of the $(n,m)$-point cross-correlation function. The derivation of this relationship is presented in Appendix B.
+
+We begin by defining the $n$-point correlation function, in terms of galaxy overdensities $\delta$, for a survey volume $V_{\text{sky}}$:
+
+\begin{equation}
+   \xi_{n}(\mathbf{r}_1,...,\mathbf{r}_{n-1}) = \frac{1}{V_{\text{sky}}}\int_0^Vd^{3}x\,\delta_1(\mathbf{x})\delta_2(\mathbf{x}+\mathbf{r}_1)...\delta_n(\mathbf{x}+\mathbf{r}_{n-1}) 
+\end{equation}
+
+
+We can define a similar $n,m$-point cross-correlation function for two tracer types A and B:
+\begin{multline}
+   \xi_{n,m}(\mathbf{r}_1,...,\mathbf{r}_{n + m -1}) = \frac{1}{V_{\text{sky}}}\int_0^Vd^3x\,\delta_{A,1}(\mathbf{x})\delta_{A,2}(\mathbf{x}+\mathbf{r}_1)...\delta_{A,n}(\mathbf{x}+\mathbf{r}_{n-1}) \\
+   \times \delta_{B,1}(\mathbf{x})\delta_{B,2}(\mathbf{x}+\mathbf{r}_1)...\delta_{B,m}(\mathbf{x}+\mathbf{r}_{m-1})   
+\end{multline}
+
+Let brackets $\left<\right>_A$ denote the average over cylinder centers of tracer type A. The $m$th, $n$th moment of the bivariate counts-in-cylinders distribution is defined:
+\begin{equation}
+\left<N_A^mN_B^n\right>_A \equiv \sum_{\text{primaries A}}N_{\text{CiC,A}}^mN_{\text{CiC,B}}^n
+\end{equation}
+The factorial moments of the counts-in-cylinders distribution are defined:
+\begin{equation}
+\left<(N)_{n,m}\right>_A \equiv \sum_{\text{primaries A}}(N_A)(N_A - 1) ... (N_A - n + 1)(N_B)(N_B - 1)(N_B - m + 1)
+\end{equation}
+We further define a statistic
+\begin{equation}
+\left<\tilde{N}_n\right> \equiv \left<(N)_m\right>+\sum_{l=1}^m \Comb{m}{l}(-nV)^l\left<(N)_{m-l}\right>
+\end{equation}
+Where $n$ is the average number density, $V$ is the cylinder volume, and $\Comb{m}{l}$ denotes "m choose l."
+
+The corresponding statistic for multi-tracer counts is:
+\begin{multline}
+\left<\tilde{N}_{m,n}\right> \equiv \left<\left[(N_A)_m+\sum_{l=1}^m \Comb{m}{l}(-n_AV)^l(N_A)_{m-l}\right] \right.\\
+\times \left.\left[(N_B)_n+\sum_{l=1}^n \Comb{n}{l}(-n_BV)^l(N_B)_{n-l}\right]\right>
+\end{multline}
+
+Let $\left<\right>_{\text{rands, A}}$ denote an average over randomly-placed objects with the same number density profile as a function of redshift $n(z)$ as tracers of type A. Then we can calculate the cylinder average of the $n,m$-point correlation function:
+\begin{equation}
+\bar{\xi}_{m,n} = \frac{\left<\tilde{N}_{m-1,n}\right> - \left<\tilde{N}_{m-1,n}\right>_{\text{randoms}}}{n_A^{m-1}n_B^nV^{m+n-1}}
+\end{equation}
+Where the cylinder average is defined
+\begin{equation}
+\bar{\xi}_{m,n} \equiv \frac{1}{V_{\text{cyl}}^{n+m}}\int_{\text{cylinder}} d\mathbf{r}^{(n+m-1)}\,\xi_{n,m}(\mathbf{r}_1,...,\mathbf{r}_{n+m-1})
+\end{equation}
+One virtue of this statistic is that theoretically it has no dependence on number density, whereas the conventional moments of the counts-in-cylinders distribution, expressed in terms of correlation functions, have terms that depend on number density to different orders. Therefore, this statistic provides a means of comparing galaxy catalogs with differing number density that does not rely on downsampling the more dense catalog.
+
+\section*{Results}
+\subsection*{Counts-in-Cylinders Distribution}
+According to the methodology presented, we calculate the counts in cylinders in SV3 and the Abacus mock catalogs. Figure~\ref{1Ddist} shows the auto- and cross-counts in the two catalogs. First we compare the four different distributions in SV3. Because LRGs are more clustered tracers than ELGs, the average LRG counts around LRGs is greater than the average ELG counts around ELGs, even though the number density of ELGs is greater in this redshift range. The average counts of ELGs around LRGs and the average counts of LRGs around ELGs are very closely related: they both have to do with the cylinder average of the two-point cross-correlation function. The average ELG counts around LRGs is greater than the reverse because the number density of ELGs is higher in the chosen redshift range. However, we notice the probability of having $>4$ LRGs around an ELG cylinder center is greater than the probability of finding $>4$ ELGs clustered around an LRG; we can say the LRG clustering around ELGs is more skewed than ELG clustering around LRGs.
+
+\begin{figure*}
+\includegraphics[scale=0.5]{CiCfigs/forpaper/CiC1DSV3AbacusNadj_weighted.png}
+\caption{1D counts-in-cylinders distributions in SV3 and mock catalogs, for ELGs and LRGs. The ratio of the probability of counting $N$ secondaries in the mock catalogs to the probability in SV3 is shown in the bottom panel. A correction for fiber incompleteness is applied to the counts-in-cylinders distribution in SV3 according to the method described above; the ratio without this correction is shown in gray, while the ratio with the correction applied is shown in black. In either case, the discrepancy between the two catalogs is greatest at the high-multiplicity tail of the counts-in-cylinders distribution, where the mock catalogs underpredict clustering.}
+\label{1Ddist}
+\end{figure*}
+
+Next we compare the counts-in-cylinders distribution in the Abacus mock catalogs to the SV3 distribution. For LRGs counted around LRGs, while the average counts in cylinders in the two catalogs is consistent within sample variance (SV3: 0.261 $\pm$ 0.010, Abacus: 0.259 $\pm$ 0.001), the shape of the counts-in-cylinders distribution differs between the two catalogs; galaxies with one neighbor in the cylinder are overrepresented in Abacus, while galaxies with more than two neighbors are underrepresented. For ELG counts around ELGs, the average counts in cylinders is higher in the Abacus mock catalogs by 3 $\sigma$ (SV3: 0.094 $\pm$ 0.002, Abacus: 0.1040 $\pm$ 0.0002). This mismatch is most exaggerated for the high multiplicity counts (3+ counts).
+
+
+We expect the average auto-counts in cylinders to be consistent between these two catalogs because the Abacus HOD model was tuned to match the SV3 two-point auto-correlation functions for ELGs and LRGs \citep{rocher_desi_2024}. If the cylinder average of the two-point correlation function matches, the average counts in cylinders should also match. This is the case for the LRGs. But this method of tuning may not capture higher-order correlations, leading to a mismatch at high neighbor multiplicities.
+
+The mismatch in ELG-ELG counts between Abacus and SV3 may be attributed to the narrow redshift range selected for this study. The two-point correlation function in the ELG mock catalogs was tuned to a larger redshift range ($0.8 < z < 1.6$) than used in this study ($0.8 < z < 1$), and the HOD was found to overestimate the two-point correlation function in a lower redshift range \citep{rocher_desi_2024}.
+
+Next we examine the distribution of cross-counts. The distribution of ELGs counted around LRGs is consistent between Abacus and SV3 for neighbor multiplicities $\leq 3$, and the distribution of LRGs counted around ELGs is consistent for multiplicities $\leq 2$. At higher multiplicites, the mock catalogs underestimate counts in cylinders compared to SV3.
+
+Because the HOD used to construct the Abacus mocks assigns ELGs and LRGs to halos with independent probability, the cross-correlation function cannot be tuned to match SV3. Nevertheless, there is good agreement between the average counts of LRGs around ELGs and vice versa in SV3 and the mock catalogs, while there are discrepancies at the high-multiplicity tail of the cross-counts distribution.
+
+
+We also consider the bivariate counts-in-cylinders distribution for counts around ELGs and counts around LRGs. Tables 1 and 2 detail this distribution in SV3, while Figure \ref{bivariatedist} displays the ratio of the bivariate counts in cylinders distribution in the mock catalogs to the SV3 distribution. In general, the greatest disagreement occurs at high LRG multiplicities, where the Abacus mock catalogs underestimate counts in cylinders. However, the measurement of the bivariate counts-in-cylinders probability in high-multiplicity bins is limited by the sample variance of SV3.
+
+
+\begin{table*}
+    \caption{Bivariate Counts in Cylinders in SV3, ELG Centers. Moments are presented without a correction for incompleteness.}
+    \begin{tabular}{c c c c c c c c c c}
+    \multicolumn{2}{c}{}&\multicolumn{6}{c}{LRG Counts}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3 &4 &5\\ \cline{3-8}
+    \multirow[|l|]{5}{*}{\rotatebox[origin=c]{90}{ELG Counts}}& \multicolumn{1}{c|}{0} & 
+    0.873 (2) & 0.0382 (13) & 4.23e-3 (40) & 8.00e-4 (162) & 2.58e-4 (71) & 4.48e-5 (301) \\
+     &\multicolumn{1}{c|}{1} & 0.0726 (15) & 4.45e-3 (40) & 7.84e-4 (145) & 1.57e-4 (63)\\
+     &\multicolumn{1}{c|}{2} & 5.05e-3 (44) & 3.93e-4 (127) & 8.94e-5 (500) \\
+    &\multicolumn{1}{c|}{3} & 1.09e-4 (69) & 4.20e-4 (282) \\
+    &\multicolumn{1}{c|}{4} & 1.13e-4 (110) \\
+    
+    \end{tabular}
+    
+\end{table*}
+
+\begin{table*}
+    \caption{Bivariate Counts in Cylinders in SV3, LRG Centers. Moments are presented without a correction for incompleteness.}
+    \begin{tabular}{c c c c c c c c c c c c }
+    \multicolumn{2}{c}{}&\multicolumn{8}{c}{LRG Counts}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3 &4 &5&6&7\\ \cline{3-10}
+    \multirow[|l|]{5}{*}{\rotatebox[origin=c]{90}{ELG Counts}}& \multicolumn{1}{c|}{0} & 
+     0.735 (4) & 0.131 (2) & 0.0315 (19) & 9.97e-3 (110) & 3.68e-3 (63) & 9.45e-4 (211) & 2.34e-4 (126) & 7.35e-4 (494)\\
+     &\multicolumn{1}{c|}{1} & 0.0138 (10) & 3.99e-3 (52) & 2.20e-3 (47) & 3.41e-4 (162) & 1.06e-4 (73)\\
+     &\multicolumn{1}{c|}{2} &  3.96e-3 (51) & 1.45e-3 (25) & 4.10e-4 (137) & 1.59e-4 (72)\\
+    &\multicolumn{1}{c|}{3} &  3.00e-4 (83) & 7.99e-4 (536)\\
+    &\multicolumn{1}{c|}{4} &  7.54e-5 (508)\\
+    
+    \end{tabular}
+    
+\end{table*}
+
+\begin{figure*}
+\includegraphics[scale=0.4]{image.png}
+\caption{Ratio of the bivariate counts-in-cylinders distribution in mock catalogs to the bivariate counts-in-cylinders distribution in SV3 (with incompleteness weights applied to the SV3 distribution). Disagreement is greatest at high count multiplicity, especially high LRG multiplicity.}
+\label{bivariatedist}
+\end{figure*}
+\subsection*{Moments of Counts-in-Cylinders Distribution}
+Next, we present the moments of the bivariate counts-in-cylinders distributions. Tables 3 and 4 display the ratio of the moments of the Abacus counts-in-cylinders distribution to the SV3 counts-in-cylinders distribution. While the mean of the LRG counts around LRGs agrees between SV3 and Abacus, the second and third moments disagree by more than 2 $\sigma$ (Table 1). In the LRG-centered distribution, the Abacus mock catalogs overestimate most moments of ELG order greater than 1 by around 1 $\sigma$.
+
+The Abacus mock catalogs overestimate the mean and variance of the ELG counts around ELGs compared to SV3 by about 10\%, or 3 $\sigma$ (Table 2). However, other moments of the ELG-centered distribution, including moments with LRG order greater than zero, agree to within sample variance. 
+
+
+    \begin{table}
+    \caption{Moments of ELG-Centered Counts in Cylinders Distribution in SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{LRG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{ELG Order}}& \multicolumn{1}{c|}{0} && 0.0564 (2) & 0.0743 (4)&0.121 (1)\\
+     & \multicolumn{1}{c|}{1} &0.1 ()&8.87e-03 (9)&0.012 (1)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 0.118 ()&0.0109 (1)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &0.163 (2)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{Moments of LRG-Centered Counts in Cylinders Distribution in SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{ELG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{LRG Order}}& \multicolumn{1}{c|}{0} && 0.11 () & 0.13 (1)&0.178 (1)\\
+     & \multicolumn{1}{c|}{1} &0.259 (1)&0.038 (3)&0.0453 (4)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 0.449 (3)&0.0668 (7)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &0.998 (8)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{Moments of ELG-Centered Counts in Cylinders Distribution: Ratio of Abacus to SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{LRG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{ELG Order}}& \multicolumn{1}{c|}{0} && 0.981 (4) & 0.964 (5)&0.928 (7)\\
+     & \multicolumn{1}{c|}{1} &1.11 (2)&1.13 (11)&1.14 (13)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 1.08 (4)&1.14 (14)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &1.03 (11)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{Moments of LRG-Centered Counts in Cylinders Distribution: Ratio of Abacus to SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{ELG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{LRG Order}}& \multicolumn{1}{c|}{0} && 0.961 (4) & 0.956 (5)&0.937 (7)\\
+     & \multicolumn{1}{c|}{1} &1 (4)&0.924 (8)&0.949 (9)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 0.887 (5)&0.857 (1)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &0.775 (6)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{ELG-Centered $\bar{\xi}_{\text{cyl}}$ in SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{LRG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{ELG Order}}& \multicolumn{1}{c|}{0} && 2.85 (16) & 60.6 (7.9)&2.36e+03 (590)\\
+     & \multicolumn{1}{c|}{1} &2.62 (8)&13.7 (2.2)&360 (98.)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 16.2 (4.7)&123 (49.)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &305 (300)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{LRG-Centered $\bar{\xi}_{\text{cyl}}$ in SV3}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{ELG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{LRG Order}}& \multicolumn{1}{c|}{0} && 3.03 (17) & 18.6 (3.3)&266 (104)\\
+     & \multicolumn{1}{c|}{1} &15.4 (6)&68.9 (7.3)&460 (122)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 675 (62.)&3.24e+03 (630)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &3.44e+04 (510)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{$\bar{\xi}$: Ratio of Mock Catalogs to SV3, ELG-Centered}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{LRG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{ELG Order}}& \multicolumn{1}{c|}{0} && 0.967 (5) & 0.859 (11)&0.718 (18)\\
+     & \multicolumn{1}{c|}{1} &1.12 (3)&1.15 (18)&1.19 (33)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 0.81 (24)&1.13 (45)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &0.375 (37)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+    \begin{table}
+    \caption{$\bar{\xi}$: Ratio of Mock Catalogs to SV3, LRG-Centered}
+    \begin{tabular}{ c  c  c  c c c}
+    \multicolumn{2}{c}{}&\multicolumn{4}{c}{ELG Order}\\
+     \multicolumn{1}{c}{}& &  0&1&  2 &3\\ \cline{3-6}
+    
+    \multirow[|l|]{4}{*}{\rotatebox[origin=c]{90}{LRG Order}}& \multicolumn{1}{c|}{0} && 0.916 (5) & 0.843 (15)&0.45 (18)\\
+     & \multicolumn{1}{c|}{1} &0.994 (4)&0.871 (9)&1.06 (28)&\multicolumn{1}{c}{}\\
+    
+     &\multicolumn{1}{c|}{2} & 0.708 (7)&0.739 (14)& \multicolumn{2}{c}{}\\
+     &\multicolumn{1}{c|}{3} &0.556 (8)& \multicolumn{2}{c}{}\\
+    
+    \end{tabular}
+    
+    \end{table}
+
+For ELG counts around ELGs and LRGs, as well as LRG counts around LRGs, the average counts in cylinders agrees between the Abacus mock catalogs and the SV3 dataset. However, there is a 10\% disagreement between the ELG counts around ELGs in SV3 and Abacus. Even when the average counts in cylinders matches between the two catalogs, there is some disagreement in the shape of the distribution. For all counts in cylinders distributions, both auto- and cross-counts, disagreement is greatest at high multiplicities. Because areas of high angular density are most likely to experience fiber incompleteness, this high-multiplicity tail is in fact the \textit{most} important feature to match in mock catalogs if one wishes to use mocks to model fiber incompleteness effects. The fact that for LRG counts around LRGs, the shape of the counts-in-cylinders distribution and its moments capture this disagreement, while the two-point correlation function does not, demonstrates the efficacy of counts in cylinders in describing high-multiplicity small-scale correlations.
+
+\section*{Conclusion}
+The counts-in-cylinders distribution makes an attractive summary statistic for describing small-scale clustering because it is sensitive to skewness, or higher-order correlations, and has low dimension. By studying multi-tracer counts, one may study cross-correlations between different tracer types. 
+
+Two relevant scales to consider when evaluating clustering in DESI mock catalogs are the scale of a dark matter halo and the angular scale of a DESI fiber patrol radius. The first scale is relevant to the halo occupation distribution, assembly bias, and galaxy conformity; studying clustering on this scale tells us how well the HOD used to construct the mock catalog reproduces observation. The second scale is relevant to fiber collisions; studying clustering on this scale tells us whether the mock catalogs are appropriate to use in modeling the effects of fiber collisions. These scales happen approximately to coincide at 1 Mpc in the redshift range considered in this study, $0.8 <z<1$; we therefore we choose a cylinder radius of 1 Mpc.
+
+
+We calculate the multi-tracer counts in cylinders in the DESI One-Percent Survey, a highly complete catalog of area 140 square degrees, and 18 mock catalogs. We find that the mean counts in cylinders is consistent between these two catalogs for LRG-LRG, ELG-LRG, and LRG-ELG counts.  However, the average ELG-ELG differ by 10\%. For all four distributions, the mock catalogs underestimate high-multiplicity counts compared to SV3.
+
+Because the HOD used to populate the mock catalogs with galaxies is tuned to the two-point correlation function, we expect the mean counts in cylinders, which depends on a cylinder average of the two-point correlation function and number density, to match between these two catalogs. The fact for three counts in cylinders distributions (LRG-LRG, LRG-ELG, and ELG-LRG), the average counts in cylinders matches within sample error, but the shape of the distribution does not, demonstrates the efficacy of counts in cylinders in complementing the information provided by the two-point correlation function.
+
+We present a means of calculating cylinder integrals of cross-correlation functions with the counts-in-cylinders distribution and calculate this statistic in both SV3 and the Abacus mock catalogs. The averages of some higher-order correlation functions are inconsistent between SV3 and the mock catalogs.
+
+One limitation this work faces is sample variance due to the small survey area of SV3, which covers 140 square degrees. It is obviously desirable to use data from the DESI main survey, which covers 14,000 square degrees, a factor of 100 larger; however, the main survey is also less complete, and this incompleteness will substantially affect any measure of clustering on small scales. While typically calculations of the two-point correlation function account for incompleteness by assigning weights to pairs of galaxies based on their probability of being assigned fibers \citep{bianchi_unbiased_2017}, this method does not translate easily to counts in cylinders: it is unclear how to assign a weight to discrete counts, and because higher-order correlations are important, a group-wise inverse probability exercise would become computationally expensive. Instead, future studies might forward-model fiber incompleteness by applying fiber assignment algorithms to mock catalogs.
+
+
+
+\section*{Appendix A: Moments of Counts-in-Cylinders Distribution}
+We would like to expose the relationship between the bivariate counts-in-cylinders distribution and the $n$-point (cross-) correlation functions. In order to do so, we will first write the moments of the counts-in-cylinders distribution in terms of $n$-point correlation functions, and then we will formulate a new statistic which relates the moments of the counts-in-cylinders distribution more directly to $n$-point correlation functions. The former informs our interpretation of the counts-in-cylinders moments (presented above), while the latter defines a new summary statistic which we will compute in our two catalogs.
+\begin{comment}
+We can also write the counts in cylinder at a position $\mathbf{x}$ in terms of overdensities:
+\begin{equation}
+N_{\text{CiC}}(\mathbf{x},R) = \int_0^{\text{cyl}}d^3r \,\,n(\delta(\mathbf{x}+\mathbf{r})+1)
+\end{equation}
+Where $n$ is the average number density of the tracer.
+\subsection*{Average Counts in Cylinders}
+\end{comment}
+
+
+We begin to set up our formalism by considering the moments of the bivariate counts-in-cylinders distribution for two tracers, A and B, with cylinders centered around A. Practically, we calculate these by taking an average over all primaries A:
+\begin{multline}
+\mu_{m,n} = \frac{1}{\text{Primaries A in Sample}}\sum_{\text{A}}(\text{Secondaries A in Cylinder})^m \\
+\times(\text{Secondaries B in Cylinder})^n
+\end{multline}
+For a given primary, how can we count the secondaries in the cylinder around it? Let's consider dividing the cylinder into cells of infinitesimal volume $dV$. Each of these cells has $g$ secondary galaxies inside, $g \in {1,0}$.
+
+Let $P$ be the total number of primaries in our sample, and let $C$ be the number of cells in one cylinder. We can rewrite the sum in (1):
+\begin{equation}
+\mu_m = \frac{1}{N_{\text{tot,A}}}\sum_{j=1}^P \left(\sum_{i=1}^C g_A(x_i)\right)^m\left(\sum_{i=1}^C g_B(x_i)\right)^n
+\end{equation}
+The first sum is an average over all the primaries in the sky. The second sum is over the volume of a cylinder.
+
+We can rewrite the first sum as a sum over the volume of the sky:
+\begin{multline}
+\label{eq:momentformula}
+\mu_{m,n} = \frac{1}{n_AV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}\right)^m\left(\sum_j^{\text{cylinder}}\right)^{n} g(x_k)  g_A(x_{i_1})g_A(x_{i_2})...g_A(x_{i_m}) \\ \times g_B(x_{j_1})g_B(x_{j_2})...g_B(x_{j_n})
+\end{multline}
+Where we've used $N_{\text{tot,A}} = n_AV_{\text{sky}}$.
+
+A key consequence of the fact that we're dealing with discrete galaxies is that $g(x) = g^2(x)$. Because of this fact, we will treat $k = i$ as well as $i_1 = i_2$, $j_1 = j_2$ etc. separately.
+
+In fact, \textit{we will not consider} $i = k$ (i.e., we will exclude this term from the second and third sums), because this would correspond to counting the primary galaxy as one of the secondaries, which by definition we choose not to do.
+
+The next step in our moment-finding procedure is to write (\ref{eq:momentformula}) in terms of galaxy overdensities. We note that, for some infinitesimal volume $dV$, the galaxy count is 
+\begin{equation}
+\label{eq:discretetocontinuous}
+g(x) = n(x) = n(1+\delta(x))dV 
+\end{equation}
+Where $n \equiv \left<n(x)\right>$.
+After making the substitution (\ref{eq:discretetocontinuous}), we will rewrite the moments in terms of ($\alpha+\beta$)-point cross-correlation functions using the definition:
+\begin{multline}
+\label{eq:corrfuncdefinition}
+\xi_{\alpha,\beta}(\vec{r}_1,...,\vec{r}_{\alpha+\beta-1}) = \\ \frac{1}{V}  \int_0^Vd^3x\,\delta_{a,1}(\vec{x})\delta_{a,2}(\vec{x}+\vec{r}_1)...\delta_{a,\alpha}(\vec{x}+\vec{r}_{n-1}) \\ \times \delta_{b,1}(\vec{x}+\vec{r}_{\alpha+1})...\delta_{b,\beta-1}(\vec{x}+\vec{r}_{\alpha+\beta-1})
+\end{multline}
+
+\subsection*{Average Counts in Cylinders}
+We begin by applying the procedure described above to the lowest-order moment, the average counts in cylinders. In this case we only have one sum over the volume of the cylinder.
+\begin{equation}
+    \mu_1 = \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\sum_{i\neq k}^{\text{cylinder}} g(x_k)g(x_i)
+\end{equation}
+By ``$i \neq k$" we mean that we do not include the cell that contains the primary galaxy when we sum over the cylinder volume to count secondaries.
+
+Using (\ref{eq:discretetocontinuous}), and changing the sums into integrals, we rewrite in terms of overdensities:
+\begin{equation}
+\mu_1 = \frac{1}{nV_k^{\text{sky}}}\int_{\text{sky}}\int_{\text{cylinder}} n^2(1+\delta(x_k))(1+\delta(x_i))dV_k \,dV_i
+\end{equation}
+We find the average counts in cylinders is related to a cylinder integral of the two-point correlation function, plus a constant offset.
+\begin{equation}
+\mu_1 = nV_{\text{cylinder}} + n\int_{\text{cylinder}}\xi(r) dr^3
+\end{equation}
+
+\subsection*{Moments of Univariate Counts in Cylinders Distribution}
+Now we apply our procedure to find a general formula for the moments of the univariate counts-in-cylinders distribution. We start with (5), but this time before re-writing in terms of overdensities we must keep careful track of terms resulting from $i_1 = i_2$, etc. By doing so, we can avoid defining a correlation function at separation $\mathbf{r} = 0$, which for discrete objects approaches a delta function.
+We can rewrite (5) as products of sums where none of the ${i}$ are equal:
+\begin{multline}
+\left<N^m\right> = \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left[\left(\sum_i^{\text{cylinder}}\right)^m g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_m}) \right. \\ &\left.
++ \sum_{l=1}^{m-1}\Comb{m}{l+1} \left(\sum_i^{\text{cylinder}}\right)^{m-l} g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_{m-l}})\right]
+\end{multline}
+In the second sum, the combinatoric factor accounts for the fact that there are $\Comb{m}{l+1}$ ways that $l+1$ of the $m$ positions $x_i$ can be equal, meaning that $g(x_i)^{l+1}$ = $g(x_i)$.
+Now we can transform these sums into integrals and write everything in terms of overdensities.
+\begin{multline}
+&\left<N^m\right> = \frac{1}{V_{\text{sky}}}\int^{\text{sky}}dx_k\left[\left(\int^{\text{cyl}}dx_{i_\alpha}\right)^m  (1+\delta(x_k))\,n^m\prod_\alpha^m (1+\delta(x_\alpha)) \right. \\ &\left.
++ \sum_{l=1}^{m-1}\Comb{m}{l+1} \left(\int^{\text{cyl}}dx_{i_\alpha}\right)^{m-l} (1+\delta(x_k))  n^{m-l}\prod_\alpha^{m-l} (1+\delta(x_\alpha))\right]
+\end{multline}
+This sum of products will produce many terms, one of which is the cylinder average of the $(m+1)$-point correlation function, and many terms having to do with lower-order correlation functions. To write these conveniently, we define:
+\begin{multline}
+\Xi_\alpha \equiv n^{\alpha-1}\left[\left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{\alpha-1}\xi_\alpha(\mathbf{r}^{\alpha-1})\right. \\
+\left.+\sum_{l=1}^\alpha\Comb{\alpha-l}{l}(V)^l\left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{\alpha-1-l}\xi_{\alpha-l}(\mathbf{r}^{\alpha-l-1})\right]
+\end{multline}
+\begin{multline}
+\Xi^*_\alpha \equiv n^{\alpha}\left[\left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{\alpha}\xi_\alpha(\mathbf{(r_i-r_1)}^{\alpha})\right.\\
++\left.\sum_{l=1}^\alpha\Comb{\alpha-l}{l}(V)^l\left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{\alpha-1-l}\xi_{\alpha-l}(\mathbf{(r_i-r_1)}^{\alpha-l-1})\right]
+\end{multline}
+Using these definitions, we can write the moments of the counts in cylinders distribution:
+\begin{equation}
+\left<N^m\right> = \Xi_{m+1} + \Xi^*_{m} + \sum_{l=1}^{m}\Comb{m+1}{l+1}\left[\Xi_{m+1-l}+\Xi^*_{m+1-l}\right]
+\end{equation}
+
+\subsection*{Moments of Bivariate Counts in Cylinders Distribution}
+We can extend our above result to the bivariate counts-in-cylinders distribution.
+\begin{multline}
+&\left<N_A^mN_B^n\right> = \frac{1}{V_{\text{sky}}}\int^{\text{sky}}dx_k\left[\left(\int^{\text{cyl}}dx_{i_\alpha}\right)^m  (1+\delta_A(x_k))\,n_A^m\prod_\alpha^m (1+\delta_A(x_\alpha)) \right. \\ &\left.
++ \sum_{l=1}^{m-1}\Comb{m}{l+1} \left(\int^{\text{cyl}}dx_{i_\alpha}\right)^{m-l} (1+\delta_A(x_k))  n_A^{m-l}\prod_\alpha^{m-l} (1+\delta_A(x_\alpha))\right]
+\\ & \times\left[\left(\int^{\text{cyl}}dx_{i_\alpha}\right)^n  (1+\delta_B(x_k))\,n_B^n\prod_\alpha^n (1+\delta_B(x_\alpha)) \right. \\ &\left.
++ \sum_{l=1}^{n-1}\Comb{n}{l+1} \left(\int^{\text{cyl}}dx_{i_\alpha}\right)^{n-l} (1+\delta_B(x_k))  n_B^{n-l}\prod_\alpha^{n-l} (1+\delta_B(x_\alpha))\right]
+\end{multline}
+\begin{multline}
+\left<N_A^mN_B^m\right> = & \left[\Xi_{A,m} + \Xi^*_{A,m} + \sum_{l=1}^{m-1}\Comb{m}{l+1}\left[\Xi_{A,m-l}+\Xi^*_{A,m-l}\right]\right] 
+\\ & \otimes \left[\Xi_{B,n} + \Xi^*_{B,n} + \sum_{l=1}^{m-1}\Comb{m}{l+1}\left[\Xi_{B,n-l}+\Xi^*_{B,n-l}\right]\right] 
+\label{bivariate cic eq}
+\end{multline}
+Where by $\Xi_{a,m}\otimes\Xi_{B,n}$ we mean the $((m+1) + n)$-point cross-correlation function of tracers A and B.
+
+\section*{Appendix B: Alternate Formulations of Counts-in-Cylinders Moments}
+We may consider the lower-order terms in Equation (\ref{bivariate cic eq}) obnoxious; ideally, we would like to relate the moments of the counts in cylinders distribution to the highest-order correlation function in that sum. Considering the factorial moments of the counts-in-cylinders distribution allows us to eliminate some terms; as Szapudi and Szalay observe \citep{szapudi_new_1998}, the factorial moments of a discrete density distribution are the same as the ordinary moments of continuous distribution (there are no terms having to do with summing over the same infinitesimal volume or $i_1 = i_2$). That is to say:
+
+\begin{align}
+& \left<(N)_m\right> \equiv \left<N(N-1)...(N-m + 1)\right>  \\ &=
+\frac{n^m}{V_{\text{sky}}}\int^{\text{sky}}dx_k\left(\int^{\text{cyl}}dx_{i_\alpha}\right)^m  (1+\delta(x_k))\prod_\alpha^m (1+\delta(x_\alpha))
+\\ & = \Xi_m + \Xi^*_m \label{factorial eq}
+\end{align}
+We will prove equation (\ref{factorial eq}) by induction. Say we have some statistic $\left<(N)_m\right>$ such that
+\begin{equation}
+\left<(N)_m\right> =  \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}\right)^m g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_m})
+\end{equation}
+where $i_1 \neq i_2$, etc. This is what we are hoping to show is equal to the factorial moments; N.B., it is not the same as $\left<N^m\right>$ because none of the $i$ can be equal.
+
+We will find a relationship between $\left<(N)_m\right>$ and $\left<(N)_{m+1}\right>$.
+\begin{equation}
+\left<N(N)_m\right>  =  \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}\right)^m\sum_j^{\text{cylinder}} g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_m})g(x_j)
+\end{equation}
+Where $j = i$ is possible.
+
+\begin{multline}
+\left<N(N)_m\right> =  &\frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}\right)^{m+1} g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_{m+1}}) \\
+& + m\frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}\right)^{m} g(x_k)  g(x_{i_1})g(x_{i_2})...g(x_{i_{m}})
+\end{multline}
+\begin{equation}
+\left<N(N)_m\right>= \left<(N)_{m+1}+m(N)_m\right>
+\end{equation}
+\begin{equation}
+\left<(N)_{m+1}\right>= \left<(N-m)(N)_m\right>
+\end{equation}
+Now let's show the base case, $\left<(N)_1\right> = \left<N\right>$
+\begin{equation}
+\left<N\right> = \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\sum_i^{\text{cylinder}}g(x_k)g(x_i) = \left<(N)_1\right>
+\end{equation}
+
+We also observe that the factorial moments of the counts-in-cylinders distribution for randomly-placed cylinders is 
+\begin{equation}
+\left<(N)_m\right>_{\text{randoms}} = \Xi^*_m    
+\end{equation}
+Therefore,
+\begin{equation}
+\left<(N)_m\right>_{\text{galaxies}} - \left<(N)_m\right>_{\text{randoms}} = \Xi_m
+\end{equation}
+
+\subsection*{Counting Overdensities}
+There is a last way in which we can simplify the moments of the counts-in-cylinders distribution: by finding the moments of the galaxy overdensity rather than the moments of the cylinder counts.
+
+We would like to find a statistic
+\begin{equation}
+\left<\tilde{N}_m\right> = n^m \left[\left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{m}\xi_{m+1}(\mathbf{r}^{m}) + \left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{m}\xi_m(\mathbf{(r_i-r_1)}^{m-1})\right]
+\end{equation}
+\begin{equation}
+\left<\tilde{N}_m\right> = \frac{n^m}{V_{\text{sky}}}\int^{\text{sky}}dx_k\left(\int^{\text{cyl}}dx_{i_\alpha}\right)^m  (1+\delta(x_k))\prod_\alpha^m (\delta(x_\alpha))
+\end{equation}
+\begin{equation}
+\left<\tilde{N}_m\right> =  \frac{1}{nV_{\text{sky}}}\sum_k^{\text{sky}}\left(\sum_i^{\text{cylinder}}g(x_i) - nV_{\text{cyl}}\right)^{m} g(x_k) 
+\end{equation}
+Where $i_1 \neq i_2$, etc. Distributing these terms, we find
+\begin{equation}
+\left<\tilde{N}_m\right> =  \left<(N)_m\right>+ \sum_{l=1}^m\Comb{m}{l}(-nV)^l\left<(N)_{m-l}\right>
+\end{equation}
+This equation allows us to compute the desired statistic from the moments of the counts-in-cylinders distribution.
+We observe that the second term in (22) is merely the cylinder integral of overdensities in randomly-placed (rather than galaxy-centered cylinders), or $\left<\tilde{N}\right>$ for random-centered cylinders. So
+\begin{equation}
+\left<\tilde{N}_m\right> - \left<\tilde{N}_m\right>_{\text{randoms}} = \left(\int^{\text{cyl}}d\mathbf{r}_i\right)^{m}\xi_{m+1}(\mathbf{r}^{m})
+\end{equation}
+
+Finally, we can compute a cylinder average of the $n$-point correlation function:
+
+\begin{equation}
+\bar{\xi}_m \equiv \frac{\left<\tilde{N}_{m-1}\right> - \left<\tilde{N}_{m-1}\right>_{\text{randoms}}}{n^{m-1}V_{\text{cyl}}^{m-1}}
+\end{equation}
+
+\bibliographystyle{mnras}
+\bibliography{CiCrefs,desirefs}
+
+
+\end{document}
