@@ -348,7 +348,7 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
     fig.savefig(figdir+"Bivariate"+figtag+".png")
     
 
-def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
+def plotCiCRatio(cat1, cat2, name="", title='', plot=True, saveratios = True):
     """Plot the bin-by-bin ratio of two CiC distributions using jackknife errors.
 
     Computes the ratio of catalog2 to catalog1 for each of the four 1D tracer
@@ -388,14 +388,17 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
                 histcomb = catalog.lrgelghistcomb
                 #err = catalog.lrgelg_CiCerr
         return hist, histcomb
-    def histRatio(cat1,cat2,tracers,plot=True):
+    def histRatio(cat1,cat2,tracers,plot=True, name = "sv3incompletenessratios"):
         def histratiojacks(h1,h2):
             #first index: jackknife slice
             #second index: N_CiC
             h1 = np.transpose(np.array(h1))
             h2 = np.transpose(np.array(h2))
+            #now, first index is N_CiC, second is jackknife slice
             hist1counts = np.sum(h1)
             hist2counts = np.sum(h2)
+            print("hist1counts: ", hist1counts)
+            print("hist2counts: ", hist2counts)
             def getjack(list1, list2):
                 nsamples = len(list1)
                 sum1 = np.sum(list1)
@@ -406,19 +409,21 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
                 squares = [(((sum1-list1[i])/notzero(sum2-list2[i]) - sum1/notzero(sum2))*hist2counts/hist1counts)**2 for i in range(nsamples)]
                 sumofsquares = np.sum(squares)
                 SE = np.sqrt((nsamples-1)/nsamples*sumofsquares)
+                print(squares)
                 return SE
-            jacks = [getjack(h1[i],h2[i]) for i in range(len(h1))]
-            return jacks
+            jackstoplot = [getjack(h2[i],h1[i]) for i in range(len(h1))]
+            jacksforcorrection = [getjack(h1[i],h2[i]) for i in range(len(h1))]
+            return jackstoplot,jacksforcorrection
         hist1,hist1comb = getHist(cat1,tracers)
         hist2,hist2comb = getHist(cat2,tracers)
         hist1list = [hist1[i] for i in range(len(hist1))]
         hist2list = [hist2[i] for i in range(len(hist1))]
-        jacks = histratiojacks(hist1list,hist2list)
+        jackstoplot,jacksforcorrection = histratiojacks(hist1list,hist2list)
         with np.errstate(divide='ignore', invalid='ignore'):
             histavg = hist2comb/hist1comb
         if plot:
-            plt.errorbar(np.arange(len(histavg)),histavg,yerr=jacks,label=tracers[0]+"-"+tracers[1],capsize=3)
-        return 1./histavg
+            plt.errorbar(np.arange(len(histavg)),histavg,yerr=jackstoplot,label=tracers[0]+"-"+tracers[1],capsize=3)
+        return 1./histavg, jacksforcorrection
         '''
         #print(len(hist1[0][0]))
         #print(np.shape(histratios))
@@ -433,10 +438,10 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
 
     if plot:
         plt.figure()
-    lrglrgrat = histRatio(cat1,cat2,["LRG","LRG"],plot=plot)
-    elgelgrat = histRatio(cat1,cat2,["ELG","ELG"],plot=plot)
-    lrgelgrat = histRatio(cat1,cat2,["LRG","ELG"],plot=plot)
-    elglrgrat = histRatio(cat1,cat2,["ELG","LRG"],plot=plot)
+    lrglrgrat, lrglrgerr = histRatio(cat1,cat2,["LRG","LRG"],plot=plot)
+    elgelgrat, elgelgerr = histRatio(cat1,cat2,["ELG","ELG"],plot=plot)
+    lrgelgrat, lrgelgerr = histRatio(cat1,cat2,["LRG","ELG"],plot=plot)
+    elglrgrat, elglrgerr = histRatio(cat1,cat2,["ELG","LRG"],plot=plot)
     if plot:
         plt.legend()
         plt.title(title,fontsize=titlesize)
@@ -446,4 +451,10 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
         plt.xlim(-0.5,6.5)
         plt.ylim(0,1.1)
         plt.savefig("forpaper/ratio"+name+".png",dpi=300)
-    return elgelgrat, lrglrgrat, elglrgrat, lrgelgrat
+    ratios = np.array([elgelgrat, lrglrgrat, elglrgrat, lrgelgrat])
+    ratioerrs = np.array([elgelgerr, lrglrgerr, elglrgerr, lrgelgerr])
+    if saveratios:
+        #write to a file
+        np.save("datafiles/"+name+".csv",ratios)
+        np.save("datafiles/"+name+"error.csv",ratioerrs)
+    return ratios, ratioerrs
