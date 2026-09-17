@@ -374,8 +374,14 @@ def leaveOneOutMatrices(countmatrices,normalizer,rcond):
         inverses.append(inverse)
 
     if unconstrained:
-        print("Warning: leaving out these regions empties some true bins "
-              "(region index, bins): %s"%unconstrained)
+        allbins = sorted(set(b for _,bins in unconstrained for b in bins))
+        if all(bins == unconstrained[0][1] for _,bins in unconstrained):
+            print("Warning: true bins %s are empty in every leave-one-out sample; "
+                  "the correction there rests entirely on the regularization"%allbins)
+        else:
+            print("Warning: %d of %d regions leave some true bin empty (bins seen: %s); "
+                  "the correction there rests entirely on the regularization"
+                  %(len(unconstrained),len(countmatrices),allbins))
 
     return np.array(matrices), np.array(inverses), full, fullinverse
 
@@ -457,16 +463,189 @@ def scanRcond(CiCtable_complete,CiCtable_incomplete,truecolumn,observedcolumn,ma
     bins = np.arange(maxcounts+2)
     complete, edges = np.histogram(np.asarray(CiCtable_complete[truecolumn]),bins = bins)
     observed, edges = np.histogram(np.asarray(CiCtable_incomplete[truecolumn]),bins = bins)
-    complete = complete/np.sum(complete)
 
     C = countMatrix(CiCtable_complete,truecolumn,observedcolumn,maxcounts)
     normalizer = makeNormalizer(addextracount = addextracount)
+    return np.asarray(rcondvalues), rcondDeviations(C,observed,complete,normalizer,rcondvalues)
 
+
+def rcondDeviations(C,observedhist,truehist,normalizer,rcondvalues):
+    """RMS of corrected/true - 1 for each rcond. Works for 1D and flattened bivariate.
+
+    observedhist and truehist are unnormalized; both are converted to
+    distributions here. Bins where the truth is empty are skipped, since the
+    ratio is undefined there.
+    """
+    truth = np.ravel(truehist)/np.sum(truehist)
+    observed = np.ravel(observedhist)
+    nonzero = truth > 0
     deviations = []
     for rcond in rcondvalues:
-        corrected = correctHistogram(C,observed,normalizer,rcond)
-        nonzero = complete > 0
-        deviations.append(np.sqrt(np.mean((corrected[nonzero]/complete[nonzero] - 1)**2)))
-    return np.asarray(rcondvalues), np.asarray(deviations)
+        corrected = np.ravel(correctHistogram(C,observed,normalizer,rcond))
+        deviations.append(np.sqrt(np.mean((corrected[nonzero]/truth[nonzero] - 1)**2)))
+    return np.asarray(deviations)
+
+
+#-----------------------------------------------------------------------------
+# Building and saving the matrices for a whole catalog
+#-----------------------------------------------------------------------------
+
+#CiCPlot uses a single binmax for all four 1D tracer combinations, so every
+#matrix has to be built on the same grid. binmax=6 in PlotCiC2.ipynb means
+#counts 0..5, hence maxcounts=5 and 6x6 (36x36 bivariate) matrices.
+MAXCOUNTS = 5
+RCONDVALUES = np.logspace(-10,-0.5,25)
+
+
+def chooseRcondAndBuild(percountmatrices,perrosetteobserved,perrosettetrue,normalizer,
+                        rcondvalues = RCONDVALUES,label = ""):
+    """Pick rcond by SPLIT-SAMPLE validation, then build the leave-one-out matrices.
+
+    The scan must be split-sample or it is meaningless. The matrix is derived
+    from the same objects that make up the observed histogram (the fiberassign
+    catalog is the subset of the no-fiberassign catalog that got fibers), so a
+    matrix tested against its own sample reproduces the truth algebraically at
+    any rcond -- the scan would then always pick the smallest value offered and
+    tell you nothing.
+
+    So: build the trial matrix from half the rosettes, and judge it against the
+    complete and observed histograms of the OTHER half. That measures how well
+    the correction generalizes, which is what rcond actually trades against.
+
+    The final matrices are then built from ALL rosettes at the chosen rcond, and
+    the same rcond is used for every jackknife replicate so the regularization
+    adds no spurious scatter to the incompleteness error.
+
+    Returns (leaveOneOutMatrices result, chosen rcond, deviation curve).
+    """
+    counts = np.asarray(percountmatrices)
+    observed = np.asarray(perrosetteobserved)
+    truth = np.asarray(perrosettetrue)
+
+    calibration = np.arange(len(counts)) % 2 == 0
+    Ccalibration = np.sum(counts[calibration],axis = 0)
+    observedtest = np.sum(observed[~calibration],axis = 0)
+    truthtest = np.sum(truth[~calibration],axis = 0)
+
+    deviations = rcondDeviations(Ccalibration,observedtest,truthtest,normalizer,rcondvalues)
+    bestindex = np.nanargmin(deviations)
+    best = rcondvalues[bestindex]
+    print("  %-14s rcond = %.3e  (split-sample RMS corrected/true - 1 = %.4f; "
+          "worst in scan %.4f)"%(label,best,deviations[bestindex],np.nanmax(deviations)))
+    if bestindex in (0,len(rcondvalues)-1):
+        print("    NOTE: the optimum is at %s end of the scanned range. Either no "
+              "regularization is needed (%s end) or the range does not reach far "
+              "enough -- widen RCONDVALUES and rerun to be sure."
+              %("the low" if bestindex == 0 else "the high",
+                "low" if bestindex == 0 else "high"))
+    return leaveOneOutMatrices(counts,normalizer,best), best, deviations
+
+
+def buildMatricesForCatalog(CiCtable_complete,CiCtable_incomplete,secondarytracerCiC,
+                            maxcounts = MAXCOUNTS,rcondvalues = RCONDVALUES,
+                            addextracount = False,rosettes = None):
+    """Build primary, secondary and bivariate matrix sets for one primary tracer.
+
+    CiCtable_complete is the no-fiberassign catalog carrying the inc_counts
+    columns; CiCtable_incomplete is the fiberassign catalog, used for the
+    observed histograms that the rcond scan is judged against.
+
+    Returns a dict ready to hand to saveMatrices.
+    """
+    if rosettes is None:
+        rosettes = rosetteList(CiCtable_complete,CiCtable_incomplete)
+    rosettecolumn = np.asarray(CiCtable_complete['rosette'])
+    subsets = [CiCtable_complete[rosettecolumn == r] for r in rosettes]
+
+    bins = np.arange(maxcounts+2)
+    normalizer1d = makeNormalizer(addextracount = addextracount)
+    normalizerbiv = makeNormalizerBivariate(maxcounts,addextracount = addextracount)
+
+    #the rcond scan needs PER-ROSETTE histograms so it can be split-sample
+    incompleterosette = np.asarray(CiCtable_incomplete['rosette'])
+    incompletesubsets = [CiCtable_incomplete[incompleterosette == r] for r in rosettes]
+
+    def perrosette1d(tablelist,column):
+        return [np.histogram(np.asarray(t[column]),bins = bins)[0] for t in tablelist]
+
+    def perrosettebivariate(tablelist,column):
+        return [np.histogram2d(np.asarray(t["N_CiC"]),np.asarray(t[column]),
+                               bins = [bins,bins])[0].ravel() for t in tablelist]
+
+    #primary: true N_CiC vs observed inc_counts
+    Cprim = [countMatrix(s,"N_CiC",'inc_counts',maxcounts) for s in subsets]
+    prim, rcondprim, devprim = chooseRcondAndBuild(
+        Cprim,perrosette1d(incompletesubsets,"N_CiC"),perrosette1d(subsets,"N_CiC"),
+        normalizer1d,rcondvalues,label = "primary")
+
+    #secondary
+    Csec = [countMatrix(s,secondarytracerCiC,'inc_counts_sec',maxcounts) for s in subsets]
+    sec, rcondsec, devsec = chooseRcondAndBuild(
+        Csec,perrosette1d(incompletesubsets,secondarytracerCiC),
+        perrosette1d(subsets,secondarytracerCiC),
+        normalizer1d,rcondvalues,label = "secondary")
+
+    #bivariate, in this module's primary-slow convention: axis 0 is the primary.
+    #CiCPlot transposes for its ELG-centered histogram via primaryaxis=1.
+    Cbiv = [countMatrixBivariate(s,"N_CiC",secondarytracerCiC,maxcounts,maxcounts) for s in subsets]
+    biv, rcondbiv, devbiv = chooseRcondAndBuild(
+        Cbiv,perrosettebivariate(incompletesubsets,secondarytracerCiC),
+        perrosettebivariate(subsets,secondarytracerCiC),
+        normalizerbiv,rcondvalues,label = "bivariate")
+
+    return {'rosettes': np.asarray(rosettes),'maxcounts': maxcounts,
+            'rcondvalues': np.asarray(rcondvalues),
+            'rcond_prim': rcondprim,'rcond_sec': rcondsec,'rcond_biv': rcondbiv,
+            'deviations_prim': devprim,'deviations_sec': devsec,'deviations_biv': devbiv,
+            'prim_matrices': prim[0],'prim_inverses': prim[1],
+            'prim_full': prim[2],'prim_fullinverse': prim[3],
+            'sec_matrices': sec[0],'sec_inverses': sec[1],
+            'sec_full': sec[2],'sec_fullinverse': sec[3],
+            'biv_matrices': biv[0],'biv_inverses': biv[1],
+            'biv_full': biv[2],'biv_fullinverse': biv[3]}
+
+
+def saveMatrices(filename,matrixset):
+    """Write one primary tracer's matrix set to a .npz bundle."""
+    np.savez(filename,**matrixset)
+    print("wrote %s"%filename)
+
+
+def loadMatrices(elgfile = "datafiles/sv3incmatrix_elg.npz",
+                 lrgfile = "datafiles/sv3incmatrix_lrg.npz"):
+    """Load saved matrices as the six-entry list CiCPlot.jackknifeCiCError wants.
+
+    Order is [elgelg, lrglrg, elglrg, lrgelg, elgbivariate, lrgbivariate]: the
+    two "primary" sets are counts of a tracer around itself, and the two
+    "secondary" sets are the cross-tracer counts.
+
+    Each entry is the (matrices, inverses, full, fullinverse) tuple that
+    leaveOneOutMatrices produces, so it can also be unpacked directly.
+    """
+    elg = np.load(elgfile)
+    lrg = np.load(lrgfile)
+    def entry(bundle,prefix):
+        return (bundle[prefix+'_matrices'],bundle[prefix+'_inverses'],
+                bundle[prefix+'_full'],bundle[prefix+'_fullinverse'])
+    return [entry(elg,'prim'),entry(lrg,'prim'),
+            entry(elg,'sec'),entry(lrg,'sec'),
+            entry(elg,'biv'),entry(lrg,'biv')]
+
+
+if __name__ == "__main__":
+    print("ELG primaries (secondary tracer: N_lrgCiC)")
+    elgset = buildMatricesForCatalog(sv3elgnofiberassign,sv3elgfiberassign,"N_lrgCiC")
+    saveMatrices("datafiles/sv3incmatrix_elg.npz",elgset)
+
+    print("LRG primaries (secondary tracer: N_elgCiC)")
+    lrgset = buildMatricesForCatalog(sv3lrgnofiberassign,sv3lrgfiberassign,"N_elgCiC")
+    saveMatrices("datafiles/sv3incmatrix_lrg.npz",lrgset)
+
+    print("\nLoad into CiCPlot with:")
+    print("    import IncompletenessMatrix")
+    print("    matrices = IncompletenessMatrix.loadMatrices()")
+    print("    cat = CiCPlot.jackknifeCiCError(elgtables,lrgtables,%d,matrices=matrices)"
+          %(MAXCOUNTS+1))
+    print("NOTE: elgtables/lrgtables must be ordered to match rosettes =",elgset['rosettes'])
 
 
