@@ -19,24 +19,18 @@ def jackknifeSE(replicates,fullvalue):
     return np.sqrt((nsamples-1)/nsamples*np.sum(deviations**2,axis = 0))
 
 
-def jackknifeHistogram(counts,weights = 1,fullinverse = None,jackinverses = None,
-                       relweighterr = None,primaryaxis = 0):
+def jackknifeHistogram(counts,fullinverse = None,jackinverses = None,primaryaxis = 0):
     '''
     Pooled central value and separated jackknife error components for one histogram.
 
     Arguments:
         counts: per-rosette RAW count histograms, shape (nrosettes, ...). Works
             for 1D histograms and for 2D (bivariate) ones.
-        weights: per-bin incompleteness weights (the diagonal, separable
-            correction). Applied as a plain multiplier without renormalizing,
-            preserving the pre-existing convention.
         fullinverse: full-sample incompleteness correction matrix from
-            IncompletenessMatrix, or None for no matrix correction.
+            IncompletenessMatrix, or None for no correction.
         jackinverses: array of leave-one-out correction matrices, ordered to
             match `counts`. Supplying these is what produces a nonzero
             incompleteness error component.
-        relweighterr: relative uncertainty on `weights` -- the diagonal
-            alternative to jackinverses for the incompleteness component.
         primaryaxis: for a 2D histogram, which axis holds the PRIMARY tracer.
             IncompletenessMatrix flattens primary-slow (flat = i*n_sec + k), so
             an axis order of (secondary, primary) needs a transpose. 0 means the
@@ -61,7 +55,7 @@ def jackknifeHistogram(counts,weights = 1,fullinverse = None,jackinverses = None
     def transform(pooledcounts,inverse):
         distribution = pooledcounts/np.sum(pooledcounts)
         if inverse is None:
-            return distribution*weights
+            return distribution
         oriented = distribution.T if primaryaxis == 1 else distribution
         corrected = inverse @ np.ravel(oriented)
         corrected = corrected/np.sum(corrected)
@@ -76,8 +70,6 @@ def jackknifeHistogram(counts,weights = 1,fullinverse = None,jackinverses = None
     if jackinverses is not None:
         increplicates = [transform(total,jackinverses[k]) for k in np.arange(len(jackinverses))]
         err_inc = jackknifeSE(increplicates,central)
-    elif relweighterr is not None:
-        err_inc = np.abs(central*relweighterr)
     else:
         err_inc = np.zeros_like(central)
 
@@ -87,8 +79,7 @@ def jackknifeHistogram(counts,weights = 1,fullinverse = None,jackinverses = None
 class jackknifeCiCError:
     #makes histograms
     #computes CiC error by leave-one-out rosette jackknife
-    def __init__(self,elgtables, lrgtables, binmax, weights = None, weights_err = None,
-                 matrices = None):
+    def __init__(self,elgtables, lrgtables, binmax, matrices = None):
         '''
         Initializes jackknifeCiCError class. Makes histograms of counts in cylinders for each of several samples.
         Pools these into one histogram and computes a leave-one-out rosette jackknife error.
@@ -104,40 +95,23 @@ class jackknifeCiCError:
             elgtables: list of tables with ELG CiC counts, one per rosette
             lrgtables: list of tables with LRG CiC counts, one per rosette
             binmax: maximum number of counts in cylinders to consider
-            weights: list of [elgelgweights, lrglrgweights, elglrgweights, lrgelgweights].
-                The diagonal, separable incompleteness correction. Mutually
-                exclusive with `matrices`.
-            weights_err: list of [elgelgweights_err, lrglrgweights_err, elglrgweights_err, lrgelgweights_err],
-                uncertainties on each weight array. If provided, these become the
-                incompleteness error component, added in quadrature with the
-                sample variance. Defaults to zero arrays (no weight uncertainty).
-                Each weight error v_i affects only histogram bin i via
-                sigma_w[i] = histcomb[i] * (weights_err[i] / weights[i]).
-                For the bivariate histograms two independent weight errors contribute:
-                sigma_w[i,j] = histcomb[i,j] * sqrt((err_row[i]/w_row[i])^2 + (err_col[j]/w_col[j])^2).
-            matrices: full incompleteness correction matrices from
-                IncompletenessMatrix, as six entries in the same order as
-                `weights` extended by the two bivariate cases:
-                [elgelg, lrglrg, elglrg, lrgelg, elgbivariate, lrgbivariate].
-                Each entry is what IncompletenessMatrix.leaveOneOutMatrices
-                returns; the full-sample inverse and the leave-one-out inverse
-                array are taken from it. Unlike `weights` these capture bin
-                migration and (bivariately) primary-secondary correlation.
-                Mutually exclusive with `weights`, since both correct for
-                incompleteness and applying both would double-correct.
+            matrices: incompleteness correction matrices from IncompletenessMatrix,
+                as six entries: [elgelg, lrglrg, elglrg, lrgelg, elgbivariate,
+                lrgbivariate]. Each entry is what
+                IncompletenessMatrix.leaveOneOutMatrices returns; the full-sample
+                inverse and the leave-one-out inverse array are taken from it.
+                Defaults to None, meaning no incompleteness correction is applied
+                and *_CiCerr_inc is zero.
+
+                These matrices are the only incompleteness correction this class
+                supports. The older diagonal, separable per-bin weight arrays have
+                been removed: they could represent neither bin migration nor the
+                correlation between primary and secondary counts.
 
                 The rosette ordering of the leave-one-out matrices MUST match
                 the ordering of elgtables/lrgtables. That cannot be checked
                 here and is the caller's responsibility.
         '''
-        if matrices is not None and weights is not None:
-            raise ValueError("weights and matrices both correct for incompleteness; "
-                             "supplying both would double-correct. Pass only one.")
-        #make sure binmax is not greater than the length of the weights
-        if weights is not None:
-            weightmaxes = [len(weigh) for weigh in weights]
-            minweightlength = np.min(weightmaxes)
-            binmax = np.min([binmax, minweightlength])
         self.binmax = binmax
         #1D histograms
         ntables = len(elgtables)
@@ -151,9 +125,8 @@ class jackknifeCiCError:
 
             Entries 0-3 are the 1D tracer combinations and must be (binmax, binmax);
             entries 4-5 are the bivariate ones and must be (binmax**2, binmax**2).
-            Unlike the weights path, binmax is NOT clamped to fit: truncating a
-            deconvolution matrix is not a valid operation on it, so a mismatch is an
-            error the caller has to fix.
+            binmax is NOT clamped to fit: truncating a deconvolution matrix is not a
+            valid operation on it, so a mismatch is an error the caller has to fix.
             '''
             if matrices is None:
                 return {}
@@ -169,44 +142,7 @@ class jackknifeCiCError:
                                  %(index,len(jackinverses),ntables))
             return {'fullinverse': fullinverse, 'jackinverses': jackinverses}
 
-        #make completeness weights
-        elgweights, lrgweights, elglrgweights, lrgelgweights = weights if weights is not None else (None, None, None, None)
-        if elgweights is None:
-            elgweights = np.repeat(1,binmax)
-        if lrgweights is None:
-            lrgweights = np.repeat(1,binmax)
-        if elglrgweights is None:
-            elglrgweights = np.repeat(1,binmax)
-        if lrgelgweights is None:
-            lrgelgweights = np.repeat(1,binmax)
-
-        elgweights_err, lrgweights_err, elglrgweights_err, lrgelgweights_err = \
-            weights_err if weights_err is not None else (None, None, None, None)
-        if elgweights_err is None:
-            elgweights_err = np.zeros(binmax)
-        if lrgweights_err is None:
-            lrgweights_err = np.zeros(binmax)
-        if elglrgweights_err is None:
-            elglrgweights_err = np.zeros(binmax)
-        if lrgelgweights_err is None:
-            lrgelgweights_err = np.zeros(binmax)
-
-        multitracerweights_elg = np.outer(elglrgweights,elgweights)
-        multitracerweights_lrg = np.outer(lrgweights,lrgelgweights)
-
-        # Relative weight uncertainties. These are the diagonal way incompleteness
-        # error can arrive; they feed the same *_CiCerr_inc slot that a matrix
-        # jackknife would, so the quadrature combination is identical either way.
-        elg_rel_err = np.where(elgweights != 0, elgweights_err / elgweights, 0.0)
-        lrg_rel_err = np.where(lrgweights != 0, lrgweights_err / lrgweights, 0.0)
-        elglrg_rel_err = np.where(elglrgweights != 0, elglrgweights_err / elglrgweights, 0.0)
-        lrgelg_rel_err = np.where(lrgelgweights != 0, lrgelgweights_err / lrgelgweights, 0.0)
-
-        elgbivariate_rel_err = np.sqrt(elglrg_rel_err[:, np.newaxis]**2 + elg_rel_err[np.newaxis, :]**2)
-        lrgbivariate_rel_err = np.sqrt(lrg_rel_err[:, np.newaxis]**2 + lrgelg_rel_err[np.newaxis, :]**2)
-
-        #per-rosette RAW counts. Kept unweighted here; the *_nodens attributes
-        #below apply the weights, preserving what plotCiCRatio has always consumed.
+        #per-rosette RAW counts
         elgcounts = np.array([np.histogram(elgtables[i]["N_CiC"], bins = bins,
                                            density = False)[0] for i in range(ntables)])
         lrgcounts = np.array([np.histogram(lrgtables[i]["N_CiC"], bins = bins,
@@ -216,10 +152,10 @@ class jackknifeCiCError:
         lrgelgcounts = np.array([np.histogram(lrgtables[i]["N_elgCiC"], bins = bins,
                                               density = False)[0] for i in range(ntables)])
 
-        self.elghist_nodens = elgcounts*elgweights
-        self.lrghist_nodens = lrgcounts*lrgweights
-        self.elglrghist_nodens = elglrgcounts*elglrgweights
-        self.lrgelghist_nodens = lrgelgcounts*lrgelgweights
+        self.elghist_nodens = elgcounts
+        self.lrghist_nodens = lrgcounts
+        self.elglrghist_nodens = elglrgcounts
+        self.lrgelghist_nodens = lrgelgcounts
 
         #2D raw counts. NOTE the two axis orders differ, and deliberately so:
         #both bivariate figures plot ELG secondaries on x and LRG secondaries on y,
@@ -234,33 +170,25 @@ class jackknifeCiCError:
         #third index: lrg CiC
         #fourth index: elg CiC
         #kept per-rosette and density-normalized, as before, since these are read externally
-        self.elgmultitracerhist = np.array([h/np.sum(h) for h in elgbivariatecounts])*multitracerweights_elg
-        self.lrgmultitracerhist = np.array([h/np.sum(h) for h in lrgbivariatecounts])*multitracerweights_lrg
+        self.elgmultitracerhist = np.array([h/np.sum(h) for h in elgbivariatecounts])
+        self.lrgmultitracerhist = np.array([h/np.sum(h) for h in lrgbivariatecounts])
 
         #pooled central values with the two jackknife error components
         self.elghistcomb, self.elg_CiCerr, self.elg_CiCerr_sample, self.elg_CiCerr_inc = \
-            jackknifeHistogram(elgcounts,weights = elgweights,relweighterr = elg_rel_err,
-                               **matrixargs(0))
+            jackknifeHistogram(elgcounts,**matrixargs(0))
         self.lrghistcomb, self.lrg_CiCerr, self.lrg_CiCerr_sample, self.lrg_CiCerr_inc = \
-            jackknifeHistogram(lrgcounts,weights = lrgweights,relweighterr = lrg_rel_err,
-                               **matrixargs(1))
+            jackknifeHistogram(lrgcounts,**matrixargs(1))
         self.elglrghistcomb, self.elglrg_CiCerr, self.elglrg_CiCerr_sample, self.elglrg_CiCerr_inc = \
-            jackknifeHistogram(elglrgcounts,weights = elglrgweights,relweighterr = elglrg_rel_err,
-                               **matrixargs(2))
+            jackknifeHistogram(elglrgcounts,**matrixargs(2))
         self.lrgelghistcomb, self.lrgelg_CiCerr, self.lrgelg_CiCerr_sample, self.lrgelg_CiCerr_inc = \
-            jackknifeHistogram(lrgelgcounts,weights = lrgelgweights,relweighterr = lrgelg_rel_err,
-                               **matrixargs(3))
+            jackknifeHistogram(lrgelgcounts,**matrixargs(3))
 
         self.elgbivariate, self.elgmultitracer_CiCerr, self.elgmultitracer_CiCerr_sample, \
             self.elgmultitracer_CiCerr_inc = \
-            jackknifeHistogram(elgbivariatecounts,weights = multitracerweights_elg,
-                               relweighterr = elgbivariate_rel_err,primaryaxis = 1,
-                               **matrixargs(4))
+            jackknifeHistogram(elgbivariatecounts,primaryaxis = 1,**matrixargs(4))
         self.lrgbivariate, self.lrgmultitracer_CiCerr, self.lrgmultitracer_CiCerr_sample, \
             self.lrgmultitracer_CiCerr_inc = \
-            jackknifeHistogram(lrgbivariatecounts,weights = multitracerweights_lrg,
-                               relweighterr = lrgbivariate_rel_err,primaryaxis = 0,
-                               **matrixargs(5))
+            jackknifeHistogram(lrgbivariatecounts,primaryaxis = 0,**matrixargs(5))
 
         #uncorrected pooled histograms, so a corrected/uncorrected comparison does
         #not require building a second object
@@ -278,7 +206,7 @@ class jackknifeCiCError:
             self.lrgnZhist = np.array([np.histogram2d(lrgtables[i]["N_CiC"],lrgtables[i]["N_elgCiC"],lrgtables['Z']
                                                   density=True,bins=bins) for i in range(ntables)],dtype='object')'''
 
-def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xranges = [5,5,5,5],weights=[None,None],weightserr = [None,None],matrices = [None,None],plot_unweighted=False,staroffset=0):
+def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xranges = [5,5,5,5],matrices = [None,None],plot_uncorrected=False,staroffset=0):
     """Plot and save side-by-side comparison of two CiC distributions.
 
     Builds jackknifeCiCError objects for both catalogs, then produces two figures:
@@ -304,23 +232,22 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
         String appended to output figure filenames.
     xranges : list of int, optional
         Display x-range for each of the four 1D histogram panels.
-    weights : list of two weight tuples, optional
-        Completeness weights for each catalog, passed to jackknifeCiCError.
-    plot_unweighted : bool, optional
-        If True, also build unweighted catalogs and overlay them on the ratio panels.
+    matrices : list of two, optional
+        Incompleteness correction matrices for each catalog, passed to
+        jackknifeCiCError. Use None for a catalog that needs no correction.
+    plot_uncorrected : bool, optional
+        If True, also build uncorrected catalogs and overlay them on the ratio panels.
     staroffset : float, optional
         Coordinate offset for significance-star annotations in bivariate panels.
     """
     fontsize = 15
     titlesize = 20
-    catalog1 = jackknifeCiCError(*cat1,binmax,weights=weights[0],weights_err = weightserr[0],
-                                 matrices = matrices[0])
-    catalog2 = jackknifeCiCError(*cat2,binmax,weights=weights[1],weights_err = weightserr[1],
-                                 matrices = matrices[1])
+    catalog1 = jackknifeCiCError(*cat1,binmax,matrices = matrices[0])
+    catalog2 = jackknifeCiCError(*cat2,binmax,matrices = matrices[1])
 
-    if plot_unweighted:
-        catalog_unweighted1 = jackknifeCiCError(*cat1,binmax)
-        catalog_unweighted2 = jackknifeCiCError(*cat2,binmax)
+    if plot_uncorrected:
+        catalog_uncorrected1 = jackknifeCiCError(*cat1,binmax)
+        catalog_uncorrected2 = jackknifeCiCError(*cat2,binmax)
     cmap = 'RdYlBu_r'
     bins = np.arange(-0.5,binmax+0.5,step=1)
     
@@ -365,14 +292,14 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
         ratio = hist1/hist2
 
         ratio_err = np.sqrt((err1/hist2)**2 + (hist1/hist2**2*err2)**2)
-        if plot_unweighted:
-            #only built when plot_unweighted is set, so these must stay inside the guard
-            hist_unweighted1, err_unweighted1 = getHist(catalog_unweighted1)
-            hist_unweighted2, err_unweighted2 = getHist(catalog_unweighted2)
-            ratio_unweighted = hist_unweighted1/hist_unweighted2
-            ratio_unweighted_err = np.sqrt((err_unweighted1/hist_unweighted2)**2 + (hist_unweighted1/hist_unweighted2**2*err_unweighted2)**2)
-            ax[1,index].errorbar(bins[:-1]+0.5,ratio_unweighted,yerr=ratio_unweighted_err,color='gray',capsize=2,label='Unweighted')
-        ax[1,index].errorbar(bins[:-1]+0.5,ratio,yerr=ratio_err,color='black',capsize=2,label='Weighted')
+        if plot_uncorrected:
+            #only built when plot_uncorrected is set, so these must stay inside the guard
+            hist_uncorrected1, err_uncorrected1 = getHist(catalog_uncorrected1)
+            hist_uncorrected2, err_uncorrected2 = getHist(catalog_uncorrected2)
+            ratio_uncorrected = hist_uncorrected1/hist_uncorrected2
+            ratio_uncorrected_err = np.sqrt((err_uncorrected1/hist_uncorrected2)**2 + (hist_uncorrected1/hist_uncorrected2**2*err_uncorrected2)**2)
+            ax[1,index].errorbar(bins[:-1]+0.5,ratio_uncorrected,yerr=ratio_uncorrected_err,color='gray',capsize=2,label='Uncorrected')
+        ax[1,index].errorbar(bins[:-1]+0.5,ratio,yerr=ratio_err,color='black',capsize=2,label='Corrected')
         ax[1,index].plot([-0.5,xrange+0.5],[1,1],color='black',linestyle='dotted')
         #ax[1].set_ylim(0,2)
         ax[1,index].set_ylim(0,2)
@@ -467,26 +394,35 @@ def compare2CatalogsCiC(cat1, cat2, name1, name2, binmax, figdir, figtag, xrange
     fig.savefig(figdir+"Bivariate"+figtag+".png")
     
 
-def plotCiCRatio(cat1, cat2, name="", title='', plot=True, saveratios = True):
+def plotCiCRatio(cat1, cat2, name="", title='', plot=True):
     """Plot the bin-by-bin ratio of two CiC distributions using jackknife errors.
 
-    Computes the ratio of catalog2 to catalog1 for each of the four 1D tracer
-    combinations (ELG-ELG, LRG-LRG, ELG-LRG, LRG-ELG). Errors are estimated
-    via a leave-one-out jackknife over the subsample tables. The ratio plotted
-    is catalog2 / catalog1.
+    A general comparison of any two catalogs. Computes the ratio of catalog2 to
+    catalog1 for each of the four 1D tracer combinations (ELG-ELG, LRG-LRG,
+    ELG-LRG, LRG-ELG). Errors are estimated via a leave-one-out jackknife over
+    the subsample tables.
 
-    These ratios are deliberately NOT incompleteness-matrix corrected. This
+    Returns (ratios, ratioerrs), each of shape (4, binmax) in the order
+    [elgelg, lrglrg, elglrg, lrgelg], for the ratio catalog2 / catalog1 -- the
+    same quantity that is plotted.
+
+    These ratios are deliberately NOT incompleteness-matrix corrected: the
     function consumes the raw per-rosette count arrays (*hist_nodens), and a
     matrix correction is not a per-bin multiplier so it cannot be folded into
-    counts. That is the right behavior: this is the function that *derives*
-    corrections, so it must see the uncorrected distributions.
+    counts. Comparing uncorrected distributions is the point when one catalog
+    is complete and the other is not.
+
+    This function used to also return the reciprocal as diagonal, separable
+    incompleteness weights and save them to datafiles/. That has been removed
+    along with the rest of the weights machinery; incompleteness is now
+    corrected with the matrices from IncompletenessMatrix.
 
     Parameters
     ----------
     cat1, cat2 : jackknifeCiCError
         Pre-built catalog objects.
     name : str, optional
-        Label appended to the plot title.
+        Label used in the output figure filename.
     title : str, optional
         Additional plot title text.
     plot : bool, optional
@@ -547,9 +483,10 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True, saveratios = True):
                                                np.sum(totals1)-totals1[i],np.sum(totals2)-totals2[i])
                               for i in range(nsamples)]
                 return jackknifeSE(replicates,full)
-            jackstoplot = [getjack(h2[i],h1[i], totals2, totals1) for i in range(len(h1))]
-            jacksforcorrection = [getjack(h1[i],h2[i], totals1, totals2) for i in range(len(h1))]
-            return jackstoplot,jacksforcorrection
+            #error on the plotted ratio P2/P1. The reciprocal direction used to be
+            #computed here too, purely to error-bar the diagonal correction weights;
+            #those are gone, so one direction is all that is needed.
+            return [getjack(h2[i],h1[i], totals2, totals1) for i in range(len(h1))]
         def histratiopoissonerrors(h1,h2,tracers,plot=True,name = "sv3incompletenessratios_poissonerror"):
             '''
             arguments
@@ -562,18 +499,12 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True, saveratios = True):
         hist2,hist2comb = getHist(cat2,tracers)
         hist1list = [hist1[i] for i in range(len(hist1))]
         hist2list = [hist2[i] for i in range(len(hist1))]
-        jackstoplot,jacksforcorrection = histratiojacks(hist1list,hist2list)
+        jackstoplot = histratiojacks(hist1list,hist2list)
         with np.errstate(divide='ignore', invalid='ignore'):
             histavg = hist2comb/hist1comb
         if plot:
             plt.errorbar(np.arange(len(histavg)),histavg,yerr=jackstoplot,label=tracers[0]+"-"+tracers[1],capsize=3)
-        print("jacks to plot: ",jackstoplot)
-        print("jacks for correction: ",jacksforcorrection)
-        correctionratios = 1./histavg
-        for i in range(len(correctionratios)):
-            #correct to avoid infinities. Just say there is no correction to the incompleteness.
-            if np.isinf(correctionratios[i]): correctionratios[i] = 1
-        return correctionratios, jacksforcorrection
+        return histavg, np.array(jackstoplot)
         '''
         #print(len(hist1[0][0]))
         #print(np.shape(histratios))
@@ -603,8 +534,4 @@ def plotCiCRatio(cat1, cat2, name="", title='', plot=True, saveratios = True):
         plt.savefig("forpaper/ratio"+name+".png",dpi=300)
     ratios = np.array([elgelgrat, lrglrgrat, elglrgrat, lrgelgrat])
     ratioerrs = np.array([elgelgerr, lrglrgerr, elglrgerr, lrgelgerr])
-    if saveratios:
-        #write to a file
-        np.save("datafiles/"+name,ratios)
-        np.save("datafiles/"+name+"error",ratioerrs)
     return ratios, ratioerrs
