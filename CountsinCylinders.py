@@ -141,11 +141,11 @@ def getNZ(table1, table2, primaryix, secondaryixlist):
     else:
         return table[ixlist[0]][nz]
 
-def countsInCylinders(spelg, splrg, columnnames, R_CiC, L_CiC, zlim, primarymask, primaryargs, outfilename,secondarymask = None,secondaryargs = None):
+def countsInCylinders(spelg, splrg, columnnames, R_CiC, L_CiC, zlim, primarymask, primaryargs, outfilename,secondarymask = None,secondaryargs = None,savetargetID = False):
     #Arguments: table with elgs, table with lrgs, column names = [ra,dec,z,zwarn], function to get mask for primaries (for 
         #SV3 includes rosette limits; for mocks no such limits necessary
-        
-    ra,dec,z = columnnames
+    if not savetargetID:   
+        ra,dec,z = columnnames
     elgsecondaries = spelg[(spelg[z] > zlim[0])&(spelg[z] < zlim[1])]
     lrgsecondaries = splrg[(splrg[z] > zlim[0])&(splrg[z] < zlim[1])]
     
@@ -231,16 +231,18 @@ def countsInCylinders(spelg, splrg, columnnames, R_CiC, L_CiC, zlim, primarymask
     #save our results
     #elg_col = np.concatenate((columnnames,['x','y','z','d','N_CiC','N_lrgCiC']))
     #lrg_col = np.concatenate((columnnames,['x','y','z','d','N_CiC','N_elgCiC']))
+
+    colstosave = [ra,dec,z,'x','y','z','d','N_CiC','N_lrgCiC']
     
     if ('rosette' in elgprimaries.columns):
         elgprimaries['rosette'] = [ros[0] for ros in elgprimaries['rosette']]
         lrgprimaries['rosette'] = [ros[0] for ros in lrgprimaries['rosette']]
-        
-        elgtowrite = elgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_lrgCiC','rosette']
-        lrgtowrite = lrgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_elgCiC','rosette']
-    else:
-        elgtowrite = elgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_lrgCiC']
-        lrgtowrite = lrgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_elgCiC']
+        colstosave.append('rosette')
+
+    if savetargetID:
+        colstosave.append('TARGETID')
+    elgtowrite = elgprimaries[colstosave]
+    lrgtowrite = lrgprimaries[colstosave]
 
     astropy.io.ascii.write(elgtowrite, 'datafiles/'+outfilename+'_elg.csv', overwrite=True,format='csv')
     astropy.io.ascii.write(lrgtowrite, 'datafiles/'+outfilename+'_lrg.csv', overwrite=True,format='csv')
@@ -409,7 +411,7 @@ def countsInCylindersCartesian(spelg, splrg, columnnames, R_CiC, L_CiC, primarym
     print('Saved file datafiles/'+outfilename+'_elg.csv')
     print('Saved file datafiles/'+outfilename+'_lrg.csv')
 
-def countsInCylindersHoleClean(spelg, splrg, spholeselg, spholeslrg, columnnames, R_CiC, L_CiC, R_hole, zlim, primarymask, primaryargs, outfilename):
+def countsInCylindersHoleClean(spelg, splrg, spholeselg, spholeslrg, columnnames, R_CiC, L_CiC, R_hole, zlim, primarymask, primaryargs, outfilename, savetargetID = False):
     #Arguments: table with elgs, table with lrgs, column names = [ra,dec,z,zwarn], function to get mask for primaries (for 
         #SV3 includes rosette limits; for mocks no such limits necessary
     
@@ -579,15 +581,23 @@ def countsInCylindersHoleClean(spelg, splrg, spholeselg, spholeslrg, columnnames
     #elg_col = np.concatenate((columnnames,['x','y','z','d','N_CiC','N_lrgCiC']))
     #lrg_col = np.concatenate((columnnames,['x','y','z','d','N_CiC','N_elgCiC']))
     
+    colstosave = [ra,dec,z,'x','y','z','d','N_CiC']
+    
     if ('rosette' in elgprimaries.columns):
         elgprimaries['rosette'] = [ros[0] for ros in elgprimaries['rosette']]
         lrgprimaries['rosette'] = [ros[0] for ros in lrgprimaries['rosette']]
-        
-        elgtowrite = elgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_lrgCiC','rosette']
-        lrgtowrite = lrgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_elgCiC','rosette']
-    else:
-        elgtowrite = elgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_lrgCiC']
-        lrgtowrite = lrgprimaries[ra,dec,z,'x','y','z','d','N_CiC','N_elgCiC']
+        colstosave.append('rosette')
+
+    if savetargetID:
+        colstosave.append('TARGETID')
+
+    colstosaveelg = colstosave.copy()
+    colstosavelrg = colstosave.copy()
+    colstosaveelg.append('N_lrgCiC')
+    colstosavelrg.append('N_elgCiC')
+
+    elgtowrite = elgprimaries[colstosaveelg]
+    lrgtowrite = lrgprimaries[colstosavelrg]
 
     astropy.io.ascii.write(elgtowrite, 'datafiles/'+outfilename+'_elg.csv', overwrite=True,format='csv')
     astropy.io.ascii.write(lrgtowrite, 'datafiles/'+outfilename+'_lrg.csv', overwrite=True,format='csv')

@@ -633,10 +633,10 @@ def printCiCTableLaTeX(hist,captiontxt,lrg = False,scientific = False):
         LaTeX string containing the full table environment.
     """
     #so hacky but whatever
-        if lrg:
-            ix = [3,6,8,0,4,7,1,5,2]
-        else:
-            ix = np.arange(9)
+    if lrg:
+        ix = [3,6,8,0,4,7,1,5,2]
+    else:
+        ix = np.arange(9)
     string = r'''
     \begin{table}
     \caption{''' + captiontxt + r'''}
