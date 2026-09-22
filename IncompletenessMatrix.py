@@ -494,7 +494,7 @@ def rcondDeviations(C,observedhist,truehist,normalizer,rcondvalues):
 #matrix has to be built on the same grid. binmax=6 in PlotCiC2.ipynb means
 #counts 0..5, hence maxcounts=5 and 6x6 (36x36 bivariate) matrices.
 MAXCOUNTS = 5
-RCONDVALUES = np.logspace(-10,-0.5,25)
+RCONDVALUES = np.logspace(-15,-0.5,25)
 
 
 def chooseRcondAndBuild(percountmatrices,perrosetteobserved,perrosettetrue,normalizer,
@@ -634,12 +634,12 @@ def loadMatrices(elgfile = "datafiles/sv3incmatrix_elg.npz",
 
 if __name__ == "__main__":
     print("ELG primaries (secondary tracer: N_lrgCiC)")
-    elgset = buildMatricesForCatalog(sv3elgnofiberassign,sv3elgfiberassign,"N_lrgCiC")
-    saveMatrices("datafiles/sv3incmatrix_elg.npz",elgset)
+    elgset = buildMatricesForCatalog(sv3elgnofiberassign,sv3elgfiberassign,"N_lrgCiC",addextracount=True)
+    saveMatrices("datafiles/sv3incmatrix_elg_plusone.npz",elgset)
 
     print("LRG primaries (secondary tracer: N_elgCiC)")
-    lrgset = buildMatricesForCatalog(sv3lrgnofiberassign,sv3lrgfiberassign,"N_elgCiC")
-    saveMatrices("datafiles/sv3incmatrix_lrg.npz",lrgset)
+    lrgset = buildMatricesForCatalog(sv3lrgnofiberassign,sv3lrgfiberassign,"N_elgCiC",addextracount=True)
+    saveMatrices("datafiles/sv3incmatrix_lrg_plusone.npz",lrgset)
 
     print("\nLoad into CiCPlot with:")
     print("    import IncompletenessMatrix")
