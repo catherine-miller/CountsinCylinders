@@ -180,25 +180,28 @@ def summarize(name,uncorrected,uncorrectederr,corrected,correctederr,completecou
 
 def plot1D(results,tag):
     """Four panels, one per tracer combination, each with both ratios."""
-    counts = np.arange(MAXCOUNTS+1)
+    #ncic is the x axis (the counts-in-cylinders value); completecounts is the
+    #number of OBJECTS in each of those bins. Keep the names distinct -- calling
+    #both of them "counts" is how they got swapped once already.
+    ncic = np.arange(MAXCOUNTS+1)
     fig, axes = plt.subplots(2,2,figsize = (11,8),sharex = True)
     for ax, entry in zip(axes.ravel(),results):
-        name, uncorrected, uncorrectederr, corrected, correctederr, counts = entry
-        mask = occupancyMask(counts)
+        name, uncorrected, uncorrectederr, corrected, correctederr, completecounts = entry
+        mask = occupancyMask(completecounts)
         ax.axhline(1.0,color = 'gray',linestyle = 'dotted')
-        ax.errorbar(counts[mask],np.asarray(uncorrected)[mask],
+        ax.errorbar(ncic[mask],np.asarray(uncorrected)[mask],
                     yerr = np.asarray(uncorrectederr)[mask],capsize = 3,marker = 'o',
                     color = 'tab:red',label = 'incomplete / complete')
-        ax.errorbar(counts[mask],np.asarray(corrected)[mask],
+        ax.errorbar(ncic[mask],np.asarray(corrected)[mask],
                     yerr = np.asarray(correctederr)[mask],capsize = 3,marker = 's',
                     color = 'tab:blue',label = 'corrected / complete')
         if np.any(~mask) and np.any(mask):
             #shade the sparse tail rather than dropping it silently
-            ax.axvspan(counts[mask].max()+0.5,counts[-1]+0.5,color = 'gray',alpha = 0.12)
-            ax.text(counts[mask].max()+0.6,ax.get_ylim()[1],
+            ax.axvspan(ncic[mask].max()+0.5,ncic[-1]+0.5,color = 'gray',alpha = 0.12)
+            ax.text(ncic[mask].max()+0.6,ax.get_ylim()[1],
                     "< %d objects"%MINCOUNTS,fontsize = 8,va = 'top',color = 'gray')
         ax.set_title(name,fontsize = 13)
-        ax.set_xticks(counts)
+        ax.set_xticks(ncic)
     for ax in axes[1]:
         ax.set_xlabel(r"$N_\mathrm{CiC}$",fontsize = 13)
     for ax in axes[:,0]:
@@ -297,8 +300,8 @@ def run(swap = False):
         incompletetest = perRosetteHistograms(rosetteSubsets(incomplete,test),truecolumn,bins)
         uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest)
         corrected, correctederr = ratioToComplete(incompletetest,completetest,inverse = inverse)
-        counts = np.sum(completetest,axis = 0)
-        results1d.append((name,uncorrected,uncorrectederr,corrected,correctederr,counts))
+        completecounts = np.sum(completetest,axis = 0)
+        results1d.append((name,uncorrected,uncorrectederr,corrected,correctederr,completecounts))
 
     print("\nchoosing rcond within the calibration half (bivariate):")
     combinations2d = [
@@ -318,17 +321,19 @@ def run(swap = False):
         uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest,shape = shape2d)
         corrected, correctederr = ratioToComplete(incompletetest,completetest,
                                                   inverse = inverse,shape = shape2d)
-        counts = np.reshape(np.sum(completetest,axis = 0),shape2d)
+        completecounts = np.reshape(np.sum(completetest,axis = 0),shape2d)
         results2d.append((name,primarylabel,secondarylabel,uncorrected,corrected,
-                          occupancyMask(counts)))
-        summaries2d.append((name,uncorrected,uncorrectederr,corrected,correctederr,counts))
+                          occupancyMask(completecounts)))
+        summaries2d.append((name,uncorrected,uncorrectederr,corrected,correctederr,
+                            completecounts))
 
     print("\nhow far each ratio sits from 1 on the held-out half:")
     for entry in results1d:
         summarize(*entry)
     for entry in summaries2d:
-        name, uncorrected, uncorrectederr, corrected, correctederr, counts = entry
-        summarize(name+" (bivariate)",uncorrected,uncorrectederr,corrected,correctederr,counts)
+        name, uncorrected, uncorrectederr, corrected, correctederr, completecounts = entry
+        summarize(name+" (bivariate)",uncorrected,uncorrectederr,corrected,correctederr,
+                  completecounts)
 
     print()
     plot1D(results1d,tag)
