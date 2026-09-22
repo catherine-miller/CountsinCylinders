@@ -115,7 +115,14 @@ def countMatrixBivariate(CiCtable_complete,primarycolumn,secondarycolumn,maxcoun
 
 
 def padDiagonal(C):
-    """Add one count to each true bin's own observed bin (the `addextracount` hack).
+    """Add one count to each true bin's own observed bin (`addextracount`).
+
+    ON BY DEFAULT. Empirically the inversion is unstable on the real SV3
+    catalogs without it: a true bin whose observed distribution is sparse or
+    empty leaves the matrix singular or nearly so, and the single count on the
+    diagonal is enough to keep it invertible. The cost is a small bias toward
+    "this bin was observed correctly", which is negligible wherever the bin is
+    well populated and is doing necessary work wherever it is not.
 
     Apply this to a *summed* count matrix, never per-rosette: padding each of
     20 rosettes and then summing would pad the total 20 times over.
@@ -190,7 +197,7 @@ def emptyTrueBins(C):
     return np.flatnonzero(np.sum(C,axis = axes) == 0)
 
 
-def makeNormalizer(addextracount = False):
+def makeNormalizer(addextracount = True):
     """Build the count-matrix -> M[true, observed] callable used by the jackknife.
 
     Returned as a closure so that padDiagonal is applied to each summed
@@ -203,7 +210,7 @@ def makeNormalizer(addextracount = False):
     return normalizer
 
 
-def makeNormalizerBivariate(maxcounts_secondaries,addextracount = False):
+def makeNormalizerBivariate(maxcounts_secondaries,addextracount = True):
     """Bivariate counterpart of makeNormalizer."""
     def normalizer(C):
         if addextracount:
@@ -217,7 +224,7 @@ def makeNormalizerBivariate(maxcounts_secondaries,addextracount = False):
 #-----------------------------------------------------------------------------
 
 def incompletenessMatrix(CiCtable_complete,secondarytracerCiC,maxcounts_primaries = None,
-                         maxcounts_secondaries = None,rcond = 1e-15,addextracount = False):
+                         maxcounts_secondaries = None,rcond = 1e-15,addextracount = True):
     """Build the 1D primary and secondary incompleteness matrices and their inverses.
 
     Returns (inc_prim, inc_sec, inc_prim_inv, inc_sec_inv): the two forward
@@ -245,7 +252,7 @@ def incompletenessMatrix(CiCtable_complete,secondarytracerCiC,maxcounts_primarie
 
 
 def bivariateIncompletenessMatrix(CiCtable_complete,secondarytracerCiC,maxcounts_primaries = None,
-                                  maxcounts_secondaries = None,rcond = 1e-15,addextracount = False):
+                                  maxcounts_secondaries = None,rcond = 1e-15,addextracount = True):
     """Build the bivariate incompleteness matrix and its regularized inverse.
 
     Returns (inc_biv, inc_biv_inv), both of shape (n_prim*n_sec, n_prim*n_sec),
@@ -387,7 +394,7 @@ def leaveOneOutMatrices(countmatrices,normalizer,rcond):
 
 
 def jackknifeMatrices(CiCtable_complete,secondarytracerCiC,maxcounts_primaries,
-                      maxcounts_secondaries,rcond,addextracount = False,rosettes = None):
+                      maxcounts_secondaries,rcond,addextracount = True,rosettes = None):
     """Array of leave-one-out 1D incompleteness matrices, one per rosette.
 
     Returns (rosettes, prim, sec). Each of prim and sec is the 4-tuple
@@ -420,7 +427,7 @@ def jackknifeMatrices(CiCtable_complete,secondarytracerCiC,maxcounts_primaries,
 
 
 def jackknifeMatricesBivariate(CiCtable_complete,secondarytracerCiC,maxcounts_primaries,
-                               maxcounts_secondaries,rcond,addextracount = False,rosettes = None):
+                               maxcounts_secondaries,rcond,addextracount = True,rosettes = None):
     """Array of leave-one-out bivariate incompleteness matrices, one per rosette.
 
     Returns (rosettes, (matrices, inverses, full, fullinverse)), with matrices
@@ -447,7 +454,7 @@ def jackknifeMatricesBivariate(CiCtable_complete,secondarytracerCiC,maxcounts_pr
 #-----------------------------------------------------------------------------
 
 def scanRcond(CiCtable_complete,CiCtable_incomplete,truecolumn,observedcolumn,maxcounts,
-              rcondvalues,addextracount = False):
+              rcondvalues,addextracount = True):
     """Pick rcond by how well the corrected histogram recovers the known truth.
 
     The no-fiberassign catalog IS the complete distribution, so the bias of the
@@ -543,7 +550,7 @@ def chooseRcondAndBuild(percountmatrices,perrosetteobserved,perrosettetrue,norma
 
 def buildMatricesForCatalog(CiCtable_complete,CiCtable_incomplete,secondarytracerCiC,
                             maxcounts = MAXCOUNTS,rcondvalues = RCONDVALUES,
-                            addextracount = False,rosettes = None):
+                            addextracount = True,rosettes = None):
     """Build primary, secondary and bivariate matrix sets for one primary tracer.
 
     CiCtable_complete is the no-fiberassign catalog carrying the inc_counts
