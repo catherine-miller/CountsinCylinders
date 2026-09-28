@@ -258,10 +258,10 @@ def bivariateIncompletenessMatrix(CiCtable_complete,secondarytracerCiC,maxcounts
     Returns (inc_biv, inc_biv_inv), both of shape (n_prim*n_sec, n_prim*n_sec),
     with the flattening convention documented in countMatrixBivariate.
 
-    This relaxes the two approximations made by the production correction,
-    which applies np.outer(elgweights, lrgweights) (CiCMoments.py) -- i.e. the
-    incompleteness matrix reduced to its diagonal (no bin migration) and
-    assumed separable in primary and secondary.
+    This relaxes the two approximations made by the former correction, which
+    applied np.outer(elgweights, lrgweights) -- i.e. the incompleteness matrix
+    reduced to its diagonal (no bin migration) and assumed separable in primary
+    and secondary. CiCPlot and CiCMoments now use this matrix instead.
     """
     if maxcounts_primaries is None:
         maxcounts_primaries = np.max(CiCtable_complete["N_CiC"])
@@ -302,8 +302,8 @@ def kroneckerBivariate(inc_prim,inc_sec,completeness = None):
     column-stochastic separable prediction.
 
     The difference between the measured bivariate matrix and this prediction is
-    the correlated part of the incompleteness -- precisely what the np.outer
-    weights in CiCMoments/CiCPlot cannot represent.
+    the correlated part of the incompleteness -- precisely what the former
+    np.outer weights in CiCMoments/CiCPlot could not represent.
     """
     fprim = columnCompleteness(inc_prim)
     fsec = columnCompleteness(inc_sec)

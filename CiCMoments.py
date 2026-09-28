@@ -19,47 +19,92 @@ import scipy.stats
 matplotlib.rcParams['mathtext.fontset'] = 'stix'
 matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
+def jackknifeSE(replicates,fullvalue):
+    """Jackknife standard error from a set of leave-one-out replicates.
+
+    Same convention as CiCPlot.jackknifeSE: squared deviations of each replicate
+    from the FULL-SAMPLE value (not from the mean of the replicates), with
+    prefactor (nsamples-1)/nsamples.
+    """
+    replicates = np.asarray(replicates)
+    nsamples = len(replicates)
+    deviations = replicates - fullvalue
+    return np.sqrt((nsamples-1)/nsamples*np.sum(deviations**2,axis = 0))
+
+
 class CiCHistnZ:
     def __init__(self,tables,elgname = "N_elgCiC",lrgname="N_lrgCiC",zname = 'Z',binmaxelg = 24,binmaxlrg = 24,
-        redshiftbins = np.linspace(0.80695,0.9919,num=20), elgweights = None, lrgweights = None,
-        elgweights_err = None, lrgweights_err = None):
+        redshiftbins = np.linspace(0.80695,0.9919,num=20), matrices = None):
         """Build a joint (N_ELG, N_LRG, redshift) histogram from a list of CiC tables.
 
         Args:
-            tables: List of astropy Tables, one per subsample or mock catalog. Each table
-                must contain per-primary-galaxy ELG counts, LRG counts, and redshift columns.
-                Moments and their standard errors are derived from the spread across tables.
+            tables: List of astropy Tables, one per rosette (or per subsample or mock
+                catalog). Each table must contain per-primary-galaxy ELG counts, LRG
+                counts, and redshift columns. Moment errors are a leave-one-out jackknife
+                over these tables.
             elgname: Column name for ELG counts-in-cylinders.
             lrgname: Column name for LRG counts-in-cylinders.
             zname: Column name for redshift.
             binmaxelg: Number of ELG count bins (covers N=0 to N=binmaxelg-1). Ignored if
-                elgweights is provided.
+                matrices is provided.
             binmaxlrg: Number of LRG count bins (covers N=0 to N=binmaxlrg-1). Ignored if
-                lrgweights is provided.
+                matrices is provided.
             redshiftbins: Edges of the redshift bins (length = n_zbins + 1).
-            elgweights: Incompleteness correction weights, one per ELG count bin. If provided,
-                len(elgweights) overrides binmaxelg. Each histogram entry is multiplied by
-                elgweights[i] * lrgweights[j] to correct for fiber incompleteness.
-            lrgweights: Incompleteness correction weights, one per LRG count bin.
-            elgweights_err: Uncertainties on elgweights, one per ELG count bin. Used to
-                propagate weight errors into moment standard errors via getWeightErrorVariance.
-                Defaults to zeros (no weight uncertainty).
-            lrgweights_err: Uncertainties on lrgweights, one per LRG count bin.
+            matrices: Bivariate incompleteness correction from IncompletenessMatrix: one
+                entry of IncompletenessMatrix.loadMatrices(), i.e. index 4 for
+                ELG-centered and index 5 for LRG-centered tables. Each entry is the
+                (matrices, inverses, full, fullinverse) tuple from leaveOneOutMatrices.
+                Defaults to None, meaning no incompleteness correction is applied and the
+                incompleteness error is zero.
+
+                The matrix fixes the count range: with an (n^2, n^2) matrix both tracers
+                get n count bins, and binmaxelg/binmaxlrg are ignored. A deconvolution
+                matrix cannot be truncated or padded, so primaries with counts outside
+                that range are dropped from the histogram (with a warning); rebuild the
+                matrices with a larger MAXCOUNTS to include them.
+
+                The same matrix is applied to every redshift slice, to raw counts, with
+                no per-slice renormalization.
+
+                The primary tracer is whichever of elgname/lrgname is "N_CiC". The
+                matrices flatten primary-slow (flat = i*n_sec + k), so the LRG-centered
+                histogram is transposed before the correction and back afterwards.
+
+                The rosette ordering of the leave-one-out matrices MUST match the
+                ordering of tables. Only the number of each is checked here.
         """
-        if elgweights is None:
-            elgweights = np.repeat(1,binmaxelg)
-        else: binmaxelg = len(elgweights)
-        if lrgweights is None:
-            lrgweights = np.repeat(1,binmaxlrg)
-        else: binmaxlrg = len(lrgweights)
+        self.fullinverse = None
+        self.jackinverses = None
+        self.primaryaxis = None
+        if matrices is not None:
+            if (elgname == "N_CiC") == (lrgname == "N_CiC"):
+                raise ValueError("cannot tell the primary tracer: exactly one of elgname (%s) and "
+                                 "lrgname (%s) must be 'N_CiC' when matrices is given"%(elgname,lrgname))
+            self.primaryaxis = 0 if elgname == "N_CiC" else 1
+            jackinverses, fullinverse = np.asarray(matrices[1]), np.asarray(matrices[3])
+            side = fullinverse.shape[0]
+            n = int(round(np.sqrt(side)))
+            if fullinverse.ndim != 2 or fullinverse.shape[1] != side or n*n != side:
+                raise ValueError("fullinverse has shape %s; expected (n^2, n^2) for a bivariate matrix"
+                                 %(fullinverse.shape,))
+            if len(jackinverses) != len(tables):
+                raise ValueError("matrices has %d leave-one-out matrices but %d tables were supplied; "
+                                 "they must correspond one to one"%(len(jackinverses),len(tables)))
+            binmaxelg = binmaxlrg = n
+            self.fullinverse = fullinverse
+            self.jackinverses = jackinverses
         bins = [np.arange(-0.5,binmaxelg+0.5,1),np.arange(-0.5,binmaxlrg+0.5,1),redshiftbins]
-        incompletenessweights = np.outer(elgweights,lrgweights)
-        self.hists = [np.histogramdd((table[elgname],table[lrgname],table[zname]),bins = bins)[0]*incompletenessweights[:,:,np.newaxis]
-            for table in tables]
-        alltab = vstack(tables)
-        histsum_raw = np.histogramdd((alltab[elgname],alltab[lrgname],alltab[zname]),bins = bins)[0]
-        self.histsum_raw = histsum_raw
-        self.histsum = histsum_raw * incompletenessweights[:,:,np.newaxis]
+        self.hists_raw = np.array([np.histogramdd((table[elgname],table[lrgname],table[zname]),bins = bins)[0]
+            for table in tables])
+        self.histsum_raw = np.sum(self.hists_raw,axis = 0)
+        if matrices is not None:
+            alltab = vstack(tables)
+            overflow = np.sum((np.asarray(alltab[elgname]) >= binmaxelg) | (np.asarray(alltab[lrgname]) >= binmaxlrg))
+            if overflow > 0:
+                print("Warning: %d of %d primaries (%.3g%%) have counts above the matrix range (0..%d) "
+                      "and are dropped from the histogram"%(overflow,len(alltab),100*overflow/len(alltab),binmaxelg-1))
+        self.hists = [self.correctHist(h,self.fullinverse) for h in self.hists_raw]
+        self.histsum = self.correctHist(self.histsum_raw,self.fullinverse)
         self.zbins = bins[2]
         self.zcenters = [(self.zbins[i]+self.zbins[i+1])/2 for i in range(len(self.zbins)-1)]
         self.binmax_elg = bins[0][-1]
@@ -67,18 +112,40 @@ class CiCHistnZ:
         self.nbins_elg = len(bins[0]) - 1
         self.nbins_lrg = len(bins[1]) - 1
         self.ntables = len(tables)
-        self.weights = [len(table) for table in tables]
-        self.elgweights = np.array(elgweights, dtype=float)
-        self.lrgweights = np.array(lrgweights, dtype=float)
-        self.elgweights_err = np.zeros(self.nbins_elg) if elgweights_err is None else np.array(elgweights_err, dtype=float)
-        self.lrgweights_err = np.zeros(self.nbins_lrg) if lrgweights_err is None else np.array(lrgweights_err, dtype=float)
+
+    def correctHist(self,hist,inverse):
+        """Apply an incompleteness correction matrix to a raw (N_ELG, N_LRG, z) histogram.
+
+        Each redshift slice is corrected with the same matrix. The correction is linear
+        and does not renormalize, so correcting per-table histograms and summing gives
+        the same result as correcting the pooled histogram. Returns hist unchanged if
+        inverse is None.
+        """
+        if inverse is None:
+            return hist
+        oriented = hist.transpose(1,0,2) if self.primaryaxis == 1 else hist
+        n0, n1, nz = oriented.shape
+        corrected = (inverse @ oriented.reshape(n0*n1,nz)).reshape(n0,n1,nz)
+        return corrected.transpose(1,0,2) if self.primaryaxis == 1 else corrected
+
+    def momentGrid(self,momentfunction,order,otherargs = []):
+        """Evaluate momentfunction(order, i, j, k, *otherargs) on every histogram cell.
+
+        Returns an array of shape (n_elg_bins, n_lrg_bins, n_zbins). i and j are the ELG
+        and LRG count values (0, 1, 2, ...) and k is the redshift bin index.
+        """
+        grid = np.zeros((self.nbins_elg,self.nbins_lrg,len(self.zbins)-1))
+        for i in range(self.nbins_elg):
+            for j in range(self.nbins_lrg):
+                for k in range(len(self.zbins)-1):
+                    grid[i,j,k] = momentfunction(order,i,j,k,*otherargs)
+        return grid
 
     def getMoment(self,hist,momentfunction,order,otherargs = []):
         """Average momentfunction over the joint (N_ELG, N_LRG, redshift) histogram.
 
-        For each histogram cell (i, j, k), evaluates momentfunction(order, i, j, k, *otherargs)
-        and returns the histogram-weighted mean. i and j are the ELG and LRG count values
-        (0, 1, 2, ...) and k is the redshift bin index.
+        Returns the histogram-weighted mean of momentfunction(order, i, j, k, *otherargs)
+        over all cells (see momentGrid).
 
         Args:
             hist: 3-D array of shape (n_elg_bins, n_lrg_bins, n_zbins).
@@ -91,91 +158,24 @@ class CiCHistnZ:
         Returns:
             Histogram-weighted average of momentfunction as a scalar.
         """
-        momentsum = 0
-        histsum = 0
-        for i in range(self.nbins_elg):
-            for j in range(self.nbins_lrg):
-                for k in range(len(self.zbins)-1):
-                    momentsum += momentfunction(order,i,j,k,*otherargs)*hist[i][j][k]
-                    histsum += hist[i][j][k] #for normalization
-        return momentsum/histsum
-
-    def getWeightErrorVariance(self, momentfunction, order, moment_value, otherargs=[]):
-        """Compute the moment variance contribution from uncertainties in elgweights and lrgweights.
-
-        The moment M is a weighted average over the histogram:
-
-            M = sum_{i,j,k} f_ijk * h_raw_ijk * w_i^ELG * w_j^LRG
-                / sum_{i,j,k} h_raw_ijk * w_i^ELG * w_j^LRG
-
-        where:
-            i, j, k      -- ELG count bin, LRG count bin, redshift bin indices
-            h_raw_ijk    -- self.histsum_raw[i,j,k]: raw (unweighted) count of primaries
-                            with ELG count i, LRG count j, in redshift bin k
-            w_i^ELG      -- self.elgweights[i]: incompleteness correction weight for ELG bin i
-            w_j^LRG      -- self.lrgweights[j]: incompleteness correction weight for LRG bin j
-            f_ijk        -- momentfunction(order, i, j, k): moment integrand value at this bin
-            M            -- moment_value: the moment itself
-            S            -- np.sum(self.histsum): total weight (normalization denominator)
-
-        Differentiating M = T/S with respect to w_i^ELG by the quotient rule gives:
-
-            dM/d(w_i^ELG) = (1/S) * sum_{j,k} h_raw_ijk * w_j^LRG * (f_ijk - M)
-
-        The (f_ijk - M) centering comes directly from the quotient rule. The LRG derivative
-        is symmetric: swap i<->j and ELG<->LRG throughout.
-
-        The total variance from all weight uncertainties (assumed independent across bins
-        and between ELG and LRG) is:
-
-            var = sum_i (dM/d(w_i^ELG) * sigma_i^ELG)^2
-                + sum_j (dM/d(w_j^LRG) * sigma_j^LRG)^2
-
-        Returns zero for any bin whose weight error is zero, so this is a no-op when
-        elgweights_err and lrgweights_err were not provided to __init__.
-
-        Args:
-            momentfunction: Same function passed to makeMomentTable.
-            order: [elg_order, lrg_order] for this moment.
-            moment_value: The already-computed moment value M, used for centering.
-            otherargs: Additional arguments forwarded to momentfunction.
-
-        Returns:
-            Scalar variance (not standard error) due to weight uncertainties.
-        """
-        S = np.sum(self.histsum)
-        variance = 0.0
-
-        for i in range(self.nbins_elg):
-            if self.elgweights_err[i] == 0:
-                continue
-            deriv = 0.0
-            for j in range(self.nbins_lrg):
-                for k in range(len(self.zbins) - 1):
-                    f = momentfunction(order, i, j, k, *otherargs)
-                    deriv += self.histsum_raw[i, j, k] * self.lrgweights[j] * (f - moment_value)
-            deriv /= S
-            variance += (deriv * self.elgweights_err[i]) ** 2
-
-        for j in range(self.nbins_lrg):
-            if self.lrgweights_err[j] == 0:
-                continue
-            deriv = 0.0
-            for i in range(self.nbins_elg):
-                for k in range(len(self.zbins) - 1):
-                    f = momentfunction(order, i, j, k, *otherargs)
-                    deriv += self.histsum_raw[i, j, k] * self.elgweights[i] * (f - moment_value)
-            deriv /= S
-            variance += (deriv * self.lrgweights_err[j]) ** 2
-
-        return variance
+        grid = self.momentGrid(momentfunction,order,otherargs)
+        return np.sum(grid*hist)/np.sum(hist)
 
     def makeMomentTable(self, maxorder,momentfunction,extraargs=[],filename = '',savesubsamples = False):
         """Compute a table of moments for all orders up to maxorder.
 
         Iterates over all [elg_order, lrg_order] pairs with elg_order + lrg_order <= maxorder,
-        excluding [0, 0]. For each order, the moment is computed for every subsample table
-        and averaged (weighted by subsample size); the standard error is std / sqrt(n_tables).
+        excluding [0, 0]. The moment is computed from the pooled, corrected histogram, and
+        its error is a leave-one-out jackknife over the tables, in the same way as
+        CiCPlot.jackknifeHistogram. There are two components:
+            sample error: correction held at the full-sample matrix, one table removed
+                from the data at a time
+            incompleteness error: data held at the full sample, correction replaced by
+                each leave-one-out matrix in turn (zero if no matrices were given)
+        These are combined in quadrature, which drops the cross-term between them. That
+        is valid when the correction is calibrated on different objects from the ones
+        being corrected (e.g. SV3 mocks with and without fiberassign, applied to SV3
+        data); it would NOT hold if the correction and the data were the same objects.
 
         Args:
             maxorder: Maximum total order (elg_order + lrg_order) to compute.
@@ -184,43 +184,54 @@ class CiCHistnZ:
             extraargs: Additional arguments forwarded to momentfunction via getMoment.
             filename: If non-empty, saves the table to this path in ascii.ecsv format.
             savesubsamples: If True, adds a "SubsampleMoments" column containing the
-                per-subsample moment values used to compute the mean and standard error.
+                moment of each table's own (corrected) histogram.
 
         Returns:
-            Astropy Table with columns "ELG Order, LRG Order", "Moment", "Standard Error",
-            and optionally "SubsampleMoments". The standard error combines sample variance
-            across subsamples and weight uncertainty from elgweights_err/lrgweights_err
-            (via getWeightErrorVariance) in quadrature.
+            Astropy Table with columns "ELG Order, LRG Order", "Moment", "Standard Error"
+            (the total error), "Sample Error", "Incompleteness Error", and optionally
+            "SubsampleMoments".
         """
-        hists = self.hists
+        def moment(grid,hist):
+            return np.sum(grid*hist)/np.sum(hist)
+
+        total = self.histsum_raw
+        samplehists = [self.correctHist(total - h,self.fullinverse) for h in self.hists_raw]
+        if self.jackinverses is not None:
+            inchists = [self.correctHist(total,inverse) for inverse in self.jackinverses]
         momentlist = []
         orderlist = []
         stderrlist = []
+        sampleerrlist = []
+        incerrlist = []
         if savesubsamples:
             ssamples = []
-        ntables = len(hists)
         for i in range(maxorder + 1):
             j = 0
             while (i + j < maxorder + 1):
                 if i == 0 and j == 0: 
                     j += 1
                     continue
-                moments = [self.getMoment(hists[k],momentfunction,[i,j],otherargs=extraargs) for k in range(self.ntables)]
-                moment_avg = np.average(moments,weights=self.weights)
-                weight_var = self.getWeightErrorVariance(momentfunction,[i,j],moment_avg,otherargs=extraargs)
-                stderrlist.append(np.sqrt((np.std(moments)/np.sqrt(ntables))**2 + weight_var))
-                momentlist.append(moment_avg)
+                grid = self.momentGrid(momentfunction,[i,j],otherargs=extraargs)
+                central = moment(grid,self.histsum)
+                sampleerr = jackknifeSE([moment(grid,h) for h in samplehists],central)
+                if self.jackinverses is not None:
+                    incerr = jackknifeSE([moment(grid,h) for h in inchists],central)
+                else:
+                    incerr = 0.
+                momentlist.append(central)
+                sampleerrlist.append(sampleerr)
+                incerrlist.append(incerr)
+                stderrlist.append(np.sqrt(sampleerr**2 + incerr**2))
                 orderlist.append([i,j])
                 if savesubsamples:
-                    ssamples.append(moments)
+                    ssamples.append([moment(grid,h) for h in self.hists])
                 j += 1
+        columns = [orderlist,momentlist,stderrlist,sampleerrlist,incerrlist]
+        names = ["ELG Order, LRG Order","Moment","Standard Error","Sample Error","Incompleteness Error"]
         if savesubsamples:
-                moments = Table([orderlist,momentlist,stderrlist,ssamples],
-                   names=("ELG Order, LRG Order","Moment","Standard Error","SubsampleMoments"),
-                   meta={'name': "Moments of ELG-centered bivariate counts in cylinders distribution"})
-        else:
-            moments = Table([orderlist,momentlist,stderrlist],
-                   names=("ELG Order, LRG Order","Moment","Standard Error"),
+            columns.append(ssamples)
+            names.append("SubsampleMoments")
+        moments = Table(columns,names=names,
                    meta={'name': "Moments of ELG-centered bivariate counts in cylinders distribution"})
         if len(filename) > 0:
             moments.write(filename, format = "ascii.ecsv", overwrite=True)

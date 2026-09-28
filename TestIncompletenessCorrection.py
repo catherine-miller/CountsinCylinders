@@ -6,6 +6,9 @@ Produces, in figs/:
 
     figs/inccorrection_1d<tag>.png    four 1D tracer combinations
     figs/inccorrection_2d<tag>.png    the two bivariate distributions
+    figs/inccorrection_moments<tag>.png
+                                      simple moments <N_ELG^m N_LRG^n> of the
+                                      two bivariate distributions
 
 Each panel compares two ratios against the complete (no-fiberassign) catalog of
 the TEST half:
@@ -14,6 +17,10 @@ the TEST half:
     corrected  / complete    what is left after the matrix correction
 
 A correction that works drives the second curve to 1 while the first deviates.
+
+The moment test computes the moments with CiCMoments.CiCHistnZ -- the code path
+the real measurement uses -- so it also checks the correction's orientation and
+count range there, not just in this script.
 
 Run with:
     python TestIncompletenessCorrection.py            calibrate on the first half
@@ -32,8 +39,10 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
+from astropy.table import Table
 
 import CiCPlot
+import CiCMoments as CM
 import IncompletenessMatrix as IM
 
 FIGDIR = "figs"
@@ -49,6 +58,15 @@ RATIOLIMIT = 2.0                    #colour scale spans 1/RATIOLIMIT to RATIOLIM
 #the RMS as "including the worst cells" rather than as a typical deviation.
 #Raise this if you want the summary restricted to well-populated bins.
 MINCOUNTS = 0
+
+#Moments up to total order MAXORDER, matching the paper's moment tables.
+MAXORDER = 3
+
+#Simple moments do not depend on redshift, and the two catalogs name their
+#redshift columns differently (RSDZ vs Z), so the moment test gives CiCHistnZ a
+#constant dummy column and a single redshift bin instead.
+ZCOLUMN = "ZDUMMY"
+ZBINS = np.array([-1.,1.])
 
 
 def rosetteSubsets(table,rosettes):
@@ -122,7 +140,12 @@ def calibrate1D(complete,incomplete,truecolumn,observedcolumn,rosettes,bins,labe
 
 
 def calibrateBivariate(complete,incomplete,secondarycolumn,rosettes,bins,label):
-    """Build the bivariate correction from the calibration rosettes only."""
+    """Build the bivariate correction from the calibration rosettes only.
+
+    Returns (inverse, leaveoneoutinverses, rcond): the full inverse over the
+    calibration rosettes, and the leave-one-out inverses over those same
+    rosettes, which the moment test uses for its incompleteness error.
+    """
     completesubsets = rosetteSubsets(complete,rosettes)
     incompletesubsets = rosetteSubsets(incomplete,rosettes)
     countmatrices = [IM.countMatrixBivariate(s,"N_CiC",secondarycolumn,MAXCOUNTS,MAXCOUNTS)
@@ -132,7 +155,7 @@ def calibrateBivariate(complete,incomplete,secondarycolumn,rosettes,bins,label):
         perRosetteHistograms2D(incompletesubsets,secondarycolumn,bins),
         perRosetteHistograms2D(completesubsets,secondarycolumn,bins),
         IM.makeNormalizerBivariate(MAXCOUNTS),label = label)
-    return result[3], rcond
+    return result[3], result[1], rcond
 
 
 def occupancyMask(completecounts):
@@ -262,6 +285,140 @@ def plot2D(results,tag):
     print("wrote %s"%path)
 
 
+def momentOrders():
+    """[ELG order, LRG order] pairs in the order CiCMoments.makeMomentTable uses."""
+    return [[i,j] for i in range(MAXORDER+1) for j in range(MAXORDER+1-i) if i+j > 0]
+
+
+def momentHistogram(tables,secondarycolumn,inverse = None):
+    """CiCHistnZ over the count range the matrices cover, with a dummy redshift.
+
+    The primary is always N_CiC; secondarycolumn says which tracer the secondary
+    is, and so whether the tables are ELG- or LRG-centered. If inverse is given
+    it is passed in as a fixed correction (the same matrix for every "leave-one-
+    out" slot), since the leave-one-out matrices here come from the calibration
+    rosettes and do not correspond one to one with the test tables.
+    """
+    if secondarycolumn == "N_lrgCiC":
+        elgname, lrgname = "N_CiC", "N_lrgCiC"
+    else:
+        elgname, lrgname = "N_elgCiC", "N_CiC"
+    counttables = [Table({"N_CiC": np.asarray(t["N_CiC"]),
+                          secondarycolumn: np.asarray(t[secondarycolumn]),
+                          ZCOLUMN: np.zeros(len(t))}) for t in tables]
+    matrices = None
+    if inverse is not None:
+        matrices = (None,[inverse]*len(tables),None,inverse)
+    return CM.CiCHistnZ(counttables,elgname = elgname,lrgname = lrgname,zname = ZCOLUMN,
+                        binmaxelg = MAXCOUNTS+1,binmaxlrg = MAXCOUNTS+1,
+                        redshiftbins = ZBINS,matrices = matrices)
+
+
+def momentRatios(incompletetables,completetables,secondarycolumn,inverse,calibrationinverses):
+    """Simple moments of the incomplete test half, with and without correction, over complete.
+
+    incompletetables and completetables must be per-rosette lists over the SAME
+    test rosettes in the same order. As in ratioToComplete, numerator and
+    denominator are resampled together in the jackknife, since they describe the
+    same footprint.
+
+    Two error components, isolated in the same way as CiCMoments.makeMomentTable:
+        sample: correction held at the calibration-half matrix, one test rosette
+            removed from both numerator and denominator at a time
+        inc:    test data held fixed, the correction replaced by each
+            leave-one-out matrix of the calibration half in turn
+    Because the matrix comes from different rosettes than the data, the cross
+    term dropped by adding these in quadrature really is zero here. The
+    uncorrected ratio has only the sample component.
+
+    Returns a dict of per-order arrays.
+    """
+    incomplete = momentHistogram(incompletetables,secondarycolumn,inverse)
+    complete = momentHistogram(completetables,secondarycolumn)
+    orders = momentOrders()
+    grids = [incomplete.momentGrid(CM.momentSimple,order) for order in orders]
+
+    def moments(hist):
+        return np.array([np.sum(grid*hist)/np.sum(hist) for grid in grids])
+
+    def ratio(rawincomplete,rawcomplete,correction):
+        return moments(incomplete.correctHist(rawincomplete,correction))/moments(rawcomplete)
+
+    totalincomplete = incomplete.histsum_raw
+    totalcomplete = complete.histsum_raw
+    nrosettes = len(incomplete.hists_raw)
+
+    def sampleerror(correction,full):
+        replicates = [ratio(totalincomplete - incomplete.hists_raw[k],
+                            totalcomplete - complete.hists_raw[k],correction)
+                      for k in np.arange(nrosettes)]
+        return CM.jackknifeSE(replicates,full)
+
+    uncorrected = ratio(totalincomplete,totalcomplete,None)
+    uncorrectederr = sampleerror(None,uncorrected)
+
+    corrected = ratio(totalincomplete,totalcomplete,inverse)
+    correctederr_sample = sampleerror(inverse,corrected)
+    correctederr_inc = CM.jackknifeSE([ratio(totalincomplete,totalcomplete,correction)
+                                       for correction in calibrationinverses],corrected)
+
+    return {'orders': orders,
+            'complete': moments(totalcomplete),
+            'uncorrected': uncorrected,'uncorrectederr': uncorrectederr,
+            'corrected': corrected,
+            'correctederr': np.sqrt(correctederr_sample**2 + correctederr_inc**2),
+            'correctederr_sample': correctederr_sample,
+            'correctederr_inc': correctederr_inc}
+
+
+def summarizeMoments(name,result):
+    """Print each moment's ratio to the complete catalog, and how many sigma from 1."""
+    print("  %s"%name)
+    print("    %-9s %12s %20s %30s %8s"%("ELG,LRG","complete","incomplete/complete",
+                                           "corrected/complete (sample, inc)","sigma"))
+    for index, order in enumerate(result['orders']):
+        err = result['correctederr'][index]
+        sigma = (result['corrected'][index] - 1)/err if err > 0 else np.nan
+        print("    %-9s %12.4g %11.4f +- %.4f %11.4f +- %.4f (%.4f, %.4f) %8.2f"
+              %("%d,%d"%tuple(order),result['complete'][index],
+                result['uncorrected'][index],result['uncorrectederr'][index],
+                result['corrected'][index],err,result['correctederr_sample'][index],
+                result['correctederr_inc'][index],sigma))
+    rmsuncorrected = np.sqrt(np.mean((result['uncorrected'] - 1)**2))
+    rmscorrected = np.sqrt(np.mean((result['corrected'] - 1)**2))
+    print("    RMS from 1: uncorrected %.4f   corrected %.4f"%(rmsuncorrected,rmscorrected))
+
+
+def plotMoments(results,tag):
+    """One panel per primary tracer: each moment's ratio to the complete catalog."""
+    fig, axes = plt.subplots(2,1,figsize = (10,8),sharex = True)
+    for ax, entry in zip(axes,results):
+        name, result = entry
+        x = np.arange(len(result['orders']))
+        ax.axhline(1.0,color = 'gray',linestyle = 'dotted')
+        ax.errorbar(x - 0.08,result['uncorrected'],yerr = result['uncorrectederr'],
+                    capsize = 3,marker = 'o',linestyle = 'none',color = 'tab:red',
+                    label = 'incomplete / complete')
+        ax.errorbar(x + 0.08,result['corrected'],yerr = result['correctederr'],
+                    capsize = 3,marker = 's',linestyle = 'none',color = 'tab:blue',
+                    label = 'corrected / complete')
+        ax.set_title(name,fontsize = 13)
+        ax.set_ylabel("Moment ratio to complete catalog",fontsize = 12)
+        ax.set_xticks(x)
+        ax.set_xticklabels([r"$\langle N_\mathrm{ELG}^{%d} N_\mathrm{LRG}^{%d}\rangle$"%tuple(order)
+                            for order in result['orders']],fontsize = 10)
+    axes[0].legend(fontsize = 11)
+    axes[-1].set_xlabel("Simple moment",fontsize = 13)
+    fig.suptitle("Incompleteness correction of bivariate CiC moments, validated on "
+                 "held-out rosettes\n(counts 0-%d only; corrected error includes the "
+                 "calibration matrix's jackknife)"%MAXCOUNTS,fontsize = 13)
+    fig.tight_layout()
+    path = os.path.join(FIGDIR,"inccorrection_moments%s.png"%tag)
+    fig.savefig(path,dpi = 200)
+    plt.close(fig)
+    print("wrote %s"%path)
+
+
 def run(swap = False):
     os.makedirs(FIGDIR,exist_ok = True)
     bins = np.arange(MAXCOUNTS+2)
@@ -312,12 +469,15 @@ def run(swap = False):
     ]
     results2d = []
     summaries2d = []
+    resultsmoments = []
     for entry in combinations2d:
         name, complete, incomplete, secondarycolumn, primarylabel, secondarylabel = entry
-        inverse, rcond = calibrateBivariate(complete,incomplete,secondarycolumn,
-                                            calibration,bins,name)
-        completetest = perRosetteHistograms2D(rosetteSubsets(complete,test),secondarycolumn,bins)
-        incompletetest = perRosetteHistograms2D(rosetteSubsets(incomplete,test),secondarycolumn,bins)
+        inverse, calibrationinverses, rcond = calibrateBivariate(complete,incomplete,secondarycolumn,
+                                                                 calibration,bins,name)
+        completetables = rosetteSubsets(complete,test)
+        incompletetables = rosetteSubsets(incomplete,test)
+        completetest = perRosetteHistograms2D(completetables,secondarycolumn,bins)
+        incompletetest = perRosetteHistograms2D(incompletetables,secondarycolumn,bins)
         uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest,shape = shape2d)
         corrected, correctederr = ratioToComplete(incompletetest,completetest,
                                                   inverse = inverse,shape = shape2d)
@@ -326,6 +486,8 @@ def run(swap = False):
                           occupancyMask(completecounts)))
         summaries2d.append((name,uncorrected,uncorrectederr,corrected,correctederr,
                             completecounts))
+        resultsmoments.append((name,momentRatios(incompletetables,completetables,secondarycolumn,
+                                                 inverse,calibrationinverses)))
 
     print("\nhow far each ratio sits from 1 on the held-out half:")
     for entry in results1d:
@@ -335,9 +497,15 @@ def run(swap = False):
         summarize(name+" (bivariate)",uncorrected,uncorrectederr,corrected,correctederr,
                   completecounts)
 
+    print("\nsimple moments of the bivariate distribution on the held-out half "
+          "(counts 0-%d only):"%MAXCOUNTS)
+    for entry in resultsmoments:
+        summarizeMoments(*entry)
+
     print()
     plot1D(results1d,tag)
     plot2D(results2d,tag)
+    plotMoments(resultsmoments,tag)
     print("\nA working correction drives 'corrected / complete' to 1 where "
           "'incomplete / complete' deviates. Blank bivariate cells are where the "
           "complete catalog is empty, so the ratio is undefined rather than zero.")
