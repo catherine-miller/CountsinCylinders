@@ -57,11 +57,15 @@ class CiCHistnZ:
                 Defaults to None, meaning no incompleteness correction is applied and the
                 incompleteness error is zero.
 
-                The matrix fixes the count range: with an (n^2, n^2) matrix both tracers
-                get n count bins, and binmaxelg/binmaxlrg are ignored. A deconvolution
-                matrix cannot be truncated or padded, so primaries with counts outside
-                that range are dropped from the histogram (with a warning); rebuild the
-                matrices with a larger MAXCOUNTS to include them.
+                The matrix fixes the count range, and binmaxelg/binmaxlrg are ignored. The
+                matrices carry an OVERFLOW state (counts above the range) as the last
+                state along each tracer's axis, so an ((n+1)^2, (n+1)^2) matrix gives
+                both tracers n in-range count bins, 0..n-1. The raw histograms
+                (hists_raw, histsum_raw) include the overflow bin, because the
+                correction needs it to correct the in-range bins properly; correctHist
+                drops it, so the corrected histograms, the moments and their errors only
+                ever see counts 0..n-1. Rebuild the matrices with a larger MAXCOUNTS to
+                extend that range.
 
                 The same matrix is applied to every redshift slice, to raw counts, with
                 no per-slice renormalization.
@@ -83,26 +87,38 @@ class CiCHistnZ:
             self.primaryaxis = 0 if elgname == "N_CiC" else 1
             jackinverses, fullinverse = np.asarray(matrices[1]), np.asarray(matrices[3])
             side = fullinverse.shape[0]
-            n = int(round(np.sqrt(side)))
-            if fullinverse.ndim != 2 or fullinverse.shape[1] != side or n*n != side:
-                raise ValueError("fullinverse has shape %s; expected (n^2, n^2) for a bivariate matrix"
-                                 %(fullinverse.shape,))
+            nstates = int(round(np.sqrt(side)))
+            if fullinverse.ndim != 2 or fullinverse.shape[1] != side or nstates*nstates != side:
+                raise ValueError("fullinverse has shape %s; expected ((n+1)^2, (n+1)^2) for a bivariate "
+                                 "matrix with an overflow state"%(fullinverse.shape,))
+            n = nstates - 1
             if len(jackinverses) != len(tables):
                 raise ValueError("matrices has %d leave-one-out matrices but %d tables were supplied; "
                                  "they must correspond one to one"%(len(jackinverses),len(tables)))
             binmaxelg = binmaxlrg = n
             self.fullinverse = fullinverse
             self.jackinverses = jackinverses
+        #half-integer edges, so bin N holds exactly count N
         bins = [np.arange(-0.5,binmaxelg+0.5,1),np.arange(-0.5,binmaxlrg+0.5,1),redshiftbins]
-        self.hists_raw = np.array([np.histogramdd((table[elgname],table[lrgname],table[zname]),bins = bins)[0]
-            for table in tables])
+        self.overflow = matrices is not None
+        if self.overflow:
+            #counts above the range are clipped into one extra (overflow) bin per tracer
+            rawbins = [np.arange(-0.5,binmaxelg+1.5,1),np.arange(-0.5,binmaxlrg+1.5,1),redshiftbins]
+            self.hists_raw = np.array([np.histogramdd((np.minimum(np.asarray(table[elgname]),binmaxelg),
+                                                       np.minimum(np.asarray(table[lrgname]),binmaxlrg),
+                                                       table[zname]),bins = rawbins)[0]
+                for table in tables])
+        else:
+            self.hists_raw = np.array([np.histogramdd((table[elgname],table[lrgname],table[zname]),bins = bins)[0]
+                for table in tables])
         self.histsum_raw = np.sum(self.hists_raw,axis = 0)
-        if matrices is not None:
+        if self.overflow:
             alltab = vstack(tables)
             overflow = np.sum((np.asarray(alltab[elgname]) >= binmaxelg) | (np.asarray(alltab[lrgname]) >= binmaxlrg))
             if overflow > 0:
-                print("Warning: %d of %d primaries (%.3g%%) have counts above the matrix range (0..%d) "
-                      "and are dropped from the histogram"%(overflow,len(alltab),100*overflow/len(alltab),binmaxelg-1))
+                print("Note: %d of %d primaries (%.3g%%) have counts above the matrix range (0..%d); "
+                      "they are used only to correct the in-range bins and never enter a moment"
+                      %(overflow,len(alltab),100*overflow/len(alltab),binmaxelg-1))
         self.hists = [self.correctHist(h,self.fullinverse) for h in self.hists_raw]
         self.histsum = self.correctHist(self.histsum_raw,self.fullinverse)
         self.zbins = bins[2]
@@ -118,15 +134,22 @@ class CiCHistnZ:
 
         Each redshift slice is corrected with the same matrix. The correction is linear
         and does not renormalize, so correcting per-table histograms and summing gives
-        the same result as correcting the pooled histogram. Returns hist unchanged if
-        inverse is None.
+        the same result as correcting the pooled histogram. If inverse is None the
+        histogram is not corrected.
+
+        If this object was built with matrices, hist must be a raw histogram including
+        the overflow bins, and the overflow row and column are dropped from the result
+        -- whether or not a correction is applied -- so what comes back always covers
+        the in-range counts only.
         """
-        if inverse is None:
-            return hist
-        oriented = hist.transpose(1,0,2) if self.primaryaxis == 1 else hist
-        n0, n1, nz = oriented.shape
-        corrected = (inverse @ oriented.reshape(n0*n1,nz)).reshape(n0,n1,nz)
-        return corrected.transpose(1,0,2) if self.primaryaxis == 1 else corrected
+        if inverse is not None:
+            oriented = hist.transpose(1,0,2) if self.primaryaxis == 1 else hist
+            n0, n1, nz = oriented.shape
+            corrected = (inverse @ oriented.reshape(n0*n1,nz)).reshape(n0,n1,nz)
+            hist = corrected.transpose(1,0,2) if self.primaryaxis == 1 else corrected
+        if self.overflow:
+            hist = hist[:-1,:-1,:]
+        return hist
 
     def momentGrid(self,momentfunction,order,otherargs = []):
         """Evaluate momentfunction(order, i, j, k, *otherargs) on every histogram cell.

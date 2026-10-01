@@ -19,7 +19,8 @@ def jackknifeSE(replicates,fullvalue):
     return np.sqrt((nsamples-1)/nsamples*np.sum(deviations**2,axis = 0))
 
 
-def jackknifeHistogram(counts,fullinverse = None,jackinverses = None,primaryaxis = 0):
+def jackknifeHistogram(counts,fullinverse = None,jackinverses = None,primaryaxis = 0,
+                       overflow = False):
     '''
     Pooled central value and separated jackknife error components for one histogram.
 
@@ -35,6 +36,11 @@ def jackknifeHistogram(counts,fullinverse = None,jackinverses = None,primaryaxis
             IncompletenessMatrix flattens primary-slow (flat = i*n_sec + k), so
             an axis order of (secondary, primary) needs a transpose. 0 means the
             histogram is already primary-slow.
+        overflow: if True, the last bin along every axis of `counts` is the
+            overflow state (counts above the range), matching the matrices'
+            overflow state. It is used only to correct the in-range bins: every
+            returned histogram -- corrected or not, central or replicate -- has
+            it dropped and is renormalized over the in-range bins.
 
     Returns (central, err_total, err_sample, err_inc).
 
@@ -52,15 +58,19 @@ def jackknifeHistogram(counts,fullinverse = None,jackinverses = None,primaryaxis
     nrosettes = len(counts)
     total = np.sum(counts,axis = 0)
 
+    def dropoverflow(distribution):
+        if overflow:
+            distribution = distribution[tuple(slice(0,-1) for _ in np.shape(distribution))]
+        return distribution/np.sum(distribution)
+
     def transform(pooledcounts,inverse):
         distribution = pooledcounts/np.sum(pooledcounts)
         if inverse is None:
-            return distribution
+            return dropoverflow(distribution)
         oriented = distribution.T if primaryaxis == 1 else distribution
         corrected = inverse @ np.ravel(oriented)
-        corrected = corrected/np.sum(corrected)
         corrected = np.reshape(corrected,np.shape(oriented))
-        return corrected.T if primaryaxis == 1 else corrected
+        return dropoverflow(corrected.T if primaryaxis == 1 else corrected)
 
     central = transform(total,fullinverse)
 
@@ -116,62 +126,81 @@ class jackknifeCiCError:
         #1D histograms
         ntables = len(elgtables)
         #print(ntables)
-        bins = np.arange(-0.5,binmax+0.5,step=1)
+        #Half-integer edges, so bin N holds exactly count N. The last bin is an
+        #OVERFLOW bin: counts are clipped to binmax, so it holds every count above
+        #binmax-1. It exists only so the matrix correction can account for those
+        #objects (the matrices carry the same overflow state); it is sliced off
+        #every histogram this class stores or returns. Without matrices, slicing
+        #it off reproduces the old behavior of dropping out-of-range counts.
+        bins = np.arange(-0.5,binmax+1.5,step=1)
+
+        def clipped(values):
+            return np.minimum(np.asarray(values),binmax)
+
+        def inrange(counts):
+            #drop the overflow bin along every count axis (axis 0 is the rosette)
+            return counts[(slice(None),) + tuple(slice(0,-1) for _ in np.shape(counts)[1:])]
 
         def matrixargs(index):
             '''
             Pull the full-sample and leave-one-out inverses for one histogram out of
             `matrices`, checking the shape.
 
-            Entries 0-3 are the 1D tracer combinations and must be (binmax, binmax);
-            entries 4-5 are the bivariate ones and must be (binmax**2, binmax**2).
-            binmax is NOT clamped to fit: truncating a deconvolution matrix is not a
-            valid operation on it, so a mismatch is an error the caller has to fix.
+            The matrices include the overflow state, so entries 0-3 (the 1D tracer
+            combinations) must be (binmax+1, binmax+1) and entries 4-5 (bivariate)
+            must be ((binmax+1)**2, (binmax+1)**2). binmax is NOT clamped to fit:
+            truncating a deconvolution matrix is not a valid operation on it, so a
+            mismatch is an error the caller has to fix.
             '''
             if matrices is None:
-                return {}
+                return {'overflow': True}
             entry = matrices[index]
             jackinverses, fullinverse = entry[1], entry[3]
-            expected = binmax**2 if index >= 4 else binmax
+            expected = (binmax+1)**2 if index >= 4 else binmax+1
             if np.shape(fullinverse) != (expected,expected):
-                raise ValueError("matrices[%d] has shape %s but binmax=%d requires (%d, %d)"
-                                 %(index,np.shape(fullinverse),binmax,expected,expected))
+                raise ValueError("matrices[%d] has shape %s but binmax=%d requires (%d, %d), "
+                                 "i.e. counts 0..%d plus the overflow state. Matrices built "
+                                 "before the overflow state was added must be rebuilt."
+                                 %(index,np.shape(fullinverse),binmax,expected,expected,binmax-1))
             if len(jackinverses) != ntables:
                 raise ValueError("matrices[%d] has %d leave-one-out matrices but %d rosette "
                                  "tables were supplied; they must correspond one to one"
                                  %(index,len(jackinverses),ntables))
-            return {'fullinverse': fullinverse, 'jackinverses': jackinverses}
+            return {'fullinverse': fullinverse, 'jackinverses': jackinverses, 'overflow': True}
 
-        #per-rosette RAW counts
-        elgcounts = np.array([np.histogram(elgtables[i]["N_CiC"], bins = bins,
+        #per-rosette RAW counts, including the overflow bin
+        elgcounts = np.array([np.histogram(clipped(elgtables[i]["N_CiC"]), bins = bins,
                                            density = False)[0] for i in range(ntables)])
-        lrgcounts = np.array([np.histogram(lrgtables[i]["N_CiC"], bins = bins,
+        lrgcounts = np.array([np.histogram(clipped(lrgtables[i]["N_CiC"]), bins = bins,
                                            density = False)[0] for i in range(ntables)])
-        elglrgcounts = np.array([np.histogram(elgtables[i]["N_lrgCiC"], bins = bins,
+        elglrgcounts = np.array([np.histogram(clipped(elgtables[i]["N_lrgCiC"]), bins = bins,
                                               density = False)[0] for i in range(ntables)])
-        lrgelgcounts = np.array([np.histogram(lrgtables[i]["N_elgCiC"], bins = bins,
+        lrgelgcounts = np.array([np.histogram(clipped(lrgtables[i]["N_elgCiC"]), bins = bins,
                                               density = False)[0] for i in range(ntables)])
 
-        self.elghist_nodens = elgcounts
-        self.lrghist_nodens = lrgcounts
-        self.elglrghist_nodens = elglrgcounts
-        self.lrgelghist_nodens = lrgelgcounts
+        #stored per-rosette counts are in range only
+        self.elghist_nodens = inrange(elgcounts)
+        self.lrghist_nodens = inrange(lrgcounts)
+        self.elglrghist_nodens = inrange(elglrgcounts)
+        self.lrgelghist_nodens = inrange(lrgelgcounts)
 
         #2D raw counts. NOTE the two axis orders differ, and deliberately so:
         #both bivariate figures plot ELG secondaries on x and LRG secondaries on y,
         #which puts the PRIMARY tracer on axis 1 for the ELG-centered histogram and
         #on axis 0 for the LRG-centered one. primaryaxis below tracks this.
-        elgbivariatecounts = np.array([np.histogram2d(elgtables[i]["N_lrgCiC"],elgtables[i]["N_CiC"],
+        elgbivariatecounts = np.array([np.histogram2d(clipped(elgtables[i]["N_lrgCiC"]),
+                                                      clipped(elgtables[i]["N_CiC"]),
                                                       density = False,bins = bins)[0] for i in range(ntables)])
-        lrgbivariatecounts = np.array([np.histogram2d(lrgtables[i]["N_CiC"],lrgtables[i]["N_elgCiC"],
+        lrgbivariatecounts = np.array([np.histogram2d(clipped(lrgtables[i]["N_CiC"]),
+                                                      clipped(lrgtables[i]["N_elgCiC"]),
                                                       density = False,bins = bins)[0] for i in range(ntables)])
 
         #first index: rosette number
         #third index: lrg CiC
         #fourth index: elg CiC
         #kept per-rosette and density-normalized, as before, since these are read externally
-        self.elgmultitracerhist = np.array([h/np.sum(h) for h in elgbivariatecounts])
-        self.lrgmultitracerhist = np.array([h/np.sum(h) for h in lrgbivariatecounts])
+        self.elgmultitracerhist = np.array([h/np.sum(h) for h in inrange(elgbivariatecounts)])
+        self.lrgmultitracerhist = np.array([h/np.sum(h) for h in inrange(lrgbivariatecounts)])
 
         #pooled central values with the two jackknife error components
         self.elghistcomb, self.elg_CiCerr, self.elg_CiCerr_sample, self.elg_CiCerr_inc = \
@@ -192,12 +221,15 @@ class jackknifeCiCError:
 
         #uncorrected pooled histograms, so a corrected/uncorrected comparison does
         #not require building a second object
-        self.elghistcomb_raw = np.sum(elgcounts,axis = 0)/np.sum(elgcounts)
-        self.lrghistcomb_raw = np.sum(lrgcounts,axis = 0)/np.sum(lrgcounts)
-        self.elglrghistcomb_raw = np.sum(elglrgcounts,axis = 0)/np.sum(elglrgcounts)
-        self.lrgelghistcomb_raw = np.sum(lrgelgcounts,axis = 0)/np.sum(lrgelgcounts)
-        self.elgbivariate_raw = np.sum(elgbivariatecounts,axis = 0)/np.sum(elgbivariatecounts)
-        self.lrgbivariate_raw = np.sum(lrgbivariatecounts,axis = 0)/np.sum(lrgbivariatecounts)
+        def pooled(counts):
+            total = np.sum(inrange(counts),axis = 0)
+            return total/np.sum(total)
+        self.elghistcomb_raw = pooled(elgcounts)
+        self.lrghistcomb_raw = pooled(lrgcounts)
+        self.elglrghistcomb_raw = pooled(elglrgcounts)
+        self.lrgelghistcomb_raw = pooled(lrgelgcounts)
+        self.elgbivariate_raw = pooled(elgbivariatecounts)
+        self.lrgbivariate_raw = pooled(lrgbivariatecounts)
 
         '''def makenZhistogram(self, elgtables, lrgtables,zbins):
             bins = [np.arange(self.binmax),np.arange(self.binmax),zbins]

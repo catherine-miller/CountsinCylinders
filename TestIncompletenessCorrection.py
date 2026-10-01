@@ -1,7 +1,9 @@
-"""Split-half validation of the incompleteness matrix correction.
+"""Validation of the incompleteness matrix correction.
 
-Derives the correction from one half of the rosettes and applies it to the other
-half, then plots how well the corrected distribution recovers the complete one.
+By default (split-half), derives the correction from one half of the rosettes
+and applies it to the other half, then plots how well the corrected distribution
+recovers the complete one. With --self it instead derives the correction from
+ALL the rosettes and applies it to those same rosettes (see "Self-test" below).
 Produces, in figs/:
 
     figs/inccorrection_1d<tag>.png    four 1D tracer combinations
@@ -11,7 +13,7 @@ Produces, in figs/:
                                       two bivariate distributions
 
 Each panel compares two ratios against the complete (no-fiberassign) catalog of
-the TEST half:
+the TEST rosettes:
 
     incomplete / complete    how much fiber assignment distorts the distribution
     corrected  / complete    what is left after the matrix correction
@@ -25,6 +27,25 @@ count range there, not just in this script.
 Run with:
     python TestIncompletenessCorrection.py            calibrate on the first half
     python TestIncompletenessCorrection.py --swap     calibrate on the second half
+    python TestIncompletenessCorrection.py --self     calibrate and test on all rosettes
+    python TestIncompletenessCorrection.py --padding 0.5
+                                                      pad the diagonal by 0.5 counts
+                                                      instead of the default 1
+or from a notebook with run(swap = ..., selftest = ..., padding = ...), which
+also returns the results.
+
+Self-test: the fiberassign catalog is the subset of the no-fiberassign catalog
+that got fibers, so a correction applied to the same rosettes it was built from
+recovers the complete distribution EXACTLY, unless something biases it. The
+only things that do are the diagonal padding and the rcond regularization.
+(Objects with counts above MAXCOUNTS do not: they sit in the matrices' overflow
+state, which is used to correct the in-range bins and then dropped.) So in the
+self-test, any deviation of corrected / complete from 1 is the bias the
+correction itself introduces, not a failure to generalize. With padding = 0 and
+a small rcond the corrected ratio is 1 to rounding error. Its error
+bars are less meaningful than in the split-half test: the matrix and the data
+come from the same rosettes, so the sample and inc errors are correlated and
+adding them in quadrature is only approximate.
 
 Importing IncompletenessMatrix does the catalog loading and the TARGETID
 cross-match that produces the inc_counts columns, so nothing else is needed.
@@ -75,19 +96,26 @@ def rosetteSubsets(table,rosettes):
     return [table[column == r] for r in rosettes]
 
 
-def perRosetteHistograms(tables,column,bins):
-    return np.array([np.histogram(np.asarray(t[column]),bins = bins)[0] for t in tables])
+def perRosetteHistograms(tables,column):
+    """Per-rosette histograms of counts 0..MAXCOUNTS plus the overflow bin."""
+    return np.array([IM.overflowHistogram(t[column],MAXCOUNTS) for t in tables])
 
 
-def perRosetteHistograms2D(tables,secondarycolumn,bins):
+def perRosetteHistograms2D(tables,secondarycolumn):
     """Bivariate histograms in IncompletenessMatrix's primary-slow orientation.
 
     Axis 0 is the primary tracer (N_CiC), axis 1 the secondary, matching
-    countMatrixBivariate's flat = i*n_sec + k convention. Flattened so the
-    correction matrix can be applied directly.
+    countMatrixBivariate's flat = i*n_sec + k convention, each with the overflow
+    bin last. Flattened so the correction matrix can be applied directly.
     """
-    return np.array([np.histogram2d(np.asarray(t["N_CiC"]),np.asarray(t[secondarycolumn]),
-                                    bins = [bins,bins])[0].ravel() for t in tables])
+    return np.array([IM.overflowHistogram2D(t["N_CiC"],t[secondarycolumn],MAXCOUNTS,MAXCOUNTS)
+                     for t in tables])
+
+
+def inRangeCounts(perrosette,shape):
+    """Pooled object counts per in-range bin (overflow dropped), in the in-range shape."""
+    total = np.reshape(np.sum(perrosette,axis = 0),shape)
+    return total[tuple(slice(0,-1) for _ in shape)]
 
 
 def pooledDistribution(perrosette):
@@ -95,8 +123,14 @@ def pooledDistribution(perrosette):
     return total/np.sum(total)
 
 
-def ratioToComplete(observedperrosette,completeperrosette,inverse = None,shape = None):
+def ratioToComplete(observedperrosette,completeperrosette,shape,inverse = None):
     """Ratio of the (optionally corrected) incomplete distribution to the complete one.
+
+    The histograms include the overflow bin(s), and shape is the full state grid
+    including them: (MAXCOUNTS+2,) or (MAXCOUNTS+2, MAXCOUNTS+2). The overflow is
+    used only for the correction; it is dropped from the corrected, uncorrected
+    and complete distributions alike, each of which is renormalized over the
+    in-range bins, so the ratio returned has the in-range shape.
 
     The error is a leave-one-out jackknife over the TEST rosettes with the
     correction matrix held fixed -- the matrix came from the other half, so it
@@ -108,13 +142,12 @@ def ratioToComplete(observedperrosette,completeperrosette,inverse = None,shape =
 
     def value(observed,complete):
         incomplete = pooledDistribution(observed)
-        truth = pooledDistribution(complete)
         if inverse is not None:
-            corrected = inverse @ np.ravel(incomplete)
-            incomplete = corrected/np.sum(corrected)
+            incomplete = inverse @ np.ravel(incomplete)
+        incomplete = IM.dropOverflow(incomplete,shape)
+        truth = IM.dropOverflow(pooledDistribution(complete),shape)
         with np.errstate(divide = 'ignore',invalid = 'ignore'):
-            ratio = np.ravel(incomplete)/np.ravel(truth)
-        return np.reshape(ratio,shape) if shape is not None else ratio
+            return incomplete/truth
 
     full = value(observedperrosette,completeperrosette)
     nrosettes = len(observedperrosette)
@@ -124,27 +157,35 @@ def ratioToComplete(observedperrosette,completeperrosette,inverse = None,shape =
     return full, CiCPlot.jackknifeSE(replicates,full)
 
 
-def calibrate1D(complete,incomplete,truecolumn,observedcolumn,rosettes,bins,label):
-    """Build the 1D correction from the calibration rosettes only."""
+def calibrate1D(complete,incomplete,truecolumn,observedcolumn,rosettes,label,
+                padding = 1.0,rcondvalues = IM.RCONDVALUES):
+    """Build the 1D correction from the calibration rosettes only.
+
+    padding is the number of counts added to each diagonal cell of the summed
+    count matrix (see IncompletenessMatrix.padDiagonal); 0 turns it off.
+    rcondvalues is the grid rcond is chosen from; pass a single value to fix it.
+    """
     completesubsets = rosetteSubsets(complete,rosettes)
     incompletesubsets = rosetteSubsets(incomplete,rosettes)
     countmatrices = [IM.countMatrix(s,truecolumn,observedcolumn,MAXCOUNTS)
                      for s in completesubsets]
     result, rcond, deviations = IM.chooseRcondAndBuild(
         countmatrices,
-        perRosetteHistograms(incompletesubsets,truecolumn,bins),
-        perRosetteHistograms(completesubsets,truecolumn,bins),
-        IM.makeNormalizer(),label = label)
+        perRosetteHistograms(incompletesubsets,truecolumn),
+        perRosetteHistograms(completesubsets,truecolumn),
+        IM.makeNormalizer(padding = padding),rcondvalues = rcondvalues,label = label)
     #result[3] is the full-sample inverse over the calibration rosettes
     return result[3], rcond
 
 
-def calibrateBivariate(complete,incomplete,secondarycolumn,rosettes,bins,label):
+def calibrateBivariate(complete,incomplete,secondarycolumn,rosettes,label,
+                       padding = 1.0,rcondvalues = IM.RCONDVALUES):
     """Build the bivariate correction from the calibration rosettes only.
 
     Returns (inverse, leaveoneoutinverses, rcond): the full inverse over the
     calibration rosettes, and the leave-one-out inverses over those same
     rosettes, which the moment test uses for its incompleteness error.
+    padding and rcondvalues are as in calibrate1D.
     """
     completesubsets = rosetteSubsets(complete,rosettes)
     incompletesubsets = rosetteSubsets(incomplete,rosettes)
@@ -152,9 +193,10 @@ def calibrateBivariate(complete,incomplete,secondarycolumn,rosettes,bins,label):
                      for s in completesubsets]
     result, rcond, deviations = IM.chooseRcondAndBuild(
         countmatrices,
-        perRosetteHistograms2D(incompletesubsets,secondarycolumn,bins),
-        perRosetteHistograms2D(completesubsets,secondarycolumn,bins),
-        IM.makeNormalizerBivariate(MAXCOUNTS),label = label)
+        perRosetteHistograms2D(incompletesubsets,secondarycolumn),
+        perRosetteHistograms2D(completesubsets,secondarycolumn),
+        IM.makeNormalizerBivariate(MAXCOUNTS,padding = padding),rcondvalues = rcondvalues,
+        label = label)
     return result[3], result[1], rcond
 
 
@@ -201,7 +243,7 @@ def summarize(name,uncorrected,uncorrectederr,corrected,correctederr,completecou
             "   ["+"; ".join(notes)+"]" if notes else ""))
 
 
-def plot1D(results,tag):
+def plot1D(results,tag,description = "validated on held-out rosettes"):
     """Four panels, one per tracer combination, each with both ratios."""
     #ncic is the x axis (the counts-in-cylinders value); completecounts is the
     #number of OBJECTS in each of those bins. Keep the names distinct -- calling
@@ -230,15 +272,16 @@ def plot1D(results,tag):
     for ax in axes[:,0]:
         ax.set_ylabel("Ratio to complete catalog",fontsize = 13)
     axes[0,0].legend(fontsize = 11)
-    fig.suptitle("Incompleteness correction validated on held-out rosettes",fontsize = 15)
+    fig.suptitle("Incompleteness correction %s"%description,fontsize = 15)
     fig.tight_layout()
     path = os.path.join(FIGDIR,"inccorrection_1d%s.png"%tag)
     fig.savefig(path,dpi = 200)
     plt.close(fig)
     print("wrote %s"%path)
+    return path
 
 
-def plot2D(results,tag):
+def plot2D(results,tag,description = "validated on held-out rosettes"):
     """Two rows (ELG- and LRG-centered), two columns (uncorrected, corrected)."""
     edges = np.arange(-0.5,MAXCOUNTS+1.5)
     fig, axes = plt.subplots(2,2,figsize = (11,10),constrained_layout = True)
@@ -277,12 +320,13 @@ def plot2D(results,tag):
     if MINCOUNTS > 0:
         subtitle = ("blank = undefined or fewer than %d objects; "
                     "red = negative probability"%MINCOUNTS)
-    fig.suptitle("Bivariate incompleteness correction validated on held-out rosettes\n"
+    fig.suptitle("Bivariate incompleteness correction %s\n"%description
                  + subtitle,fontsize = 14)
     path = os.path.join(FIGDIR,"inccorrection_2d%s.png"%tag)
     fig.savefig(path,dpi = 200)
     plt.close(fig)
     print("wrote %s"%path)
+    return path
 
 
 def momentOrders():
@@ -327,8 +371,9 @@ def momentRatios(incompletetables,completetables,secondarycolumn,inverse,calibra
             removed from both numerator and denominator at a time
         inc:    test data held fixed, the correction replaced by each
             leave-one-out matrix of the calibration half in turn
-    Because the matrix comes from different rosettes than the data, the cross
-    term dropped by adding these in quadrature really is zero here. The
+    In the split-half test the matrix comes from different rosettes than the
+    data, so the cross term dropped by adding these in quadrature really is
+    zero. In the self-test it is not, and the combined error is approximate. The
     uncorrected ratio has only the sample component.
 
     Returns a dict of per-order arrays.
@@ -389,7 +434,7 @@ def summarizeMoments(name,result):
     print("    RMS from 1: uncorrected %.4f   corrected %.4f"%(rmsuncorrected,rmscorrected))
 
 
-def plotMoments(results,tag):
+def plotMoments(results,tag,description = "validated on held-out rosettes"):
     """One panel per primary tracer: each moment's ratio to the complete catalog."""
     fig, axes = plt.subplots(2,1,figsize = (10,8),sharex = True)
     for ax, entry in zip(axes,results):
@@ -409,32 +454,62 @@ def plotMoments(results,tag):
                             for order in result['orders']],fontsize = 10)
     axes[0].legend(fontsize = 11)
     axes[-1].set_xlabel("Simple moment",fontsize = 13)
-    fig.suptitle("Incompleteness correction of bivariate CiC moments, validated on "
-                 "held-out rosettes\n(counts 0-%d only; corrected error includes the "
-                 "calibration matrix's jackknife)"%MAXCOUNTS,fontsize = 13)
+    fig.suptitle("Incompleteness correction of bivariate CiC moments, %s\n"
+                 "(counts 0-%d only; corrected error includes the "
+                 "calibration matrix's jackknife)"%(description,MAXCOUNTS),fontsize = 13)
     fig.tight_layout()
     path = os.path.join(FIGDIR,"inccorrection_moments%s.png"%tag)
     fig.savefig(path,dpi = 200)
     plt.close(fig)
     print("wrote %s"%path)
+    return path
 
 
-def run(swap = False):
+def run(swap = False,selftest = False,padding = 1.0,plots = True,rcondvalues = IM.RCONDVALUES):
+    """Calibrate the correction, apply it to the test rosettes, summarize and plot.
+
+    swap:     split-half only; calibrate on the second half instead of the first
+    selftest: calibrate and test on ALL rosettes (see the module docstring)
+    padding:  counts added to each diagonal cell of the count matrices
+    plots:    write the three figures; their paths are returned under 'figures'
+    rcondvalues: grid rcond is chosen from; a single value fixes it, which
+              separates the padding's bias from the regularization's
+
+    Returns a dict with the calibration and test rosettes, the chosen rconds,
+    and the results lists that summarize and the plot functions take:
+        results1d    (name, uncorrected, uncorrectederr, corrected, correctederr,
+                      completecounts) per 1D combination
+        summaries2d  the same for each bivariate distribution, 2D arrays
+        moments      (name, momentRatios dict) per bivariate distribution
+    """
     os.makedirs(FIGDIR,exist_ok = True)
-    bins = np.arange(MAXCOUNTS+2)
-    shape2d = (MAXCOUNTS+1,MAXCOUNTS+1)
+    #full state grids, including the overflow state that is dropped after correcting
+    shape1d = (MAXCOUNTS+2,)
+    shape2d = (MAXCOUNTS+2,MAXCOUNTS+2)
 
     #rosettes common to both catalogs of both tracers, so every split is usable
     rosettes = IM.rosetteList(IM.sv3elgnofiberassign,IM.sv3elgfiberassign,
                               IM.sv3lrgnofiberassign,IM.sv3lrgfiberassign)
-    half = len(rosettes)//2
-    first, second = rosettes[:half], rosettes[half:]
-    calibration, test = (second,first) if swap else (first,second)
-    tag = "_swapped" if swap else ""
+    if selftest:
+        calibration, test = rosettes, rosettes
+        tag = "_self"
+        description = "calibrated and tested on all rosettes"
+        testname = "all rosettes (self-test)"
+    else:
+        half = len(rosettes)//2
+        first, second = rosettes[:half], rosettes[half:]
+        calibration, test = (second,first) if swap else (first,second)
+        tag = "_swapped" if swap else ""
+        description = "validated on held-out rosettes"
+        testname = "the held-out half"
+    if padding != 1.0:
+        tag += "_pad%g"%padding
+        description += ", diagonal padding %g"%padding
 
     print("rosettes available: %s"%list(rosettes))
     print("calibrating on:     %s"%list(calibration))
-    print("testing on:         %s\n"%list(test))
+    print("testing on:         %s"%list(test))
+    print("diagonal padding:   %g\n"%padding)
 
     combinations1d = [
         ("ELG counts around ELGs",IM.sv3elgnofiberassign,IM.sv3elgfiberassign,
@@ -447,20 +522,24 @@ def run(swap = False):
          "N_elgCiC",'inc_counts_sec'),
     ]
 
-    print("choosing rcond within the calibration half (1D):")
+    print("choosing rcond within the calibration rosettes (1D):")
     results1d = []
+    rconds = {}
     for entry in combinations1d:
         name, complete, incomplete, truecolumn, observedcolumn = entry
         inverse, rcond = calibrate1D(complete,incomplete,truecolumn,observedcolumn,
-                                     calibration,bins,name)
-        completetest = perRosetteHistograms(rosetteSubsets(complete,test),truecolumn,bins)
-        incompletetest = perRosetteHistograms(rosetteSubsets(incomplete,test),truecolumn,bins)
-        uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest)
-        corrected, correctederr = ratioToComplete(incompletetest,completetest,inverse = inverse)
-        completecounts = np.sum(completetest,axis = 0)
+                                     calibration,name,padding = padding,
+                                     rcondvalues = rcondvalues)
+        rconds[name] = rcond
+        completetest = perRosetteHistograms(rosetteSubsets(complete,test),truecolumn)
+        incompletetest = perRosetteHistograms(rosetteSubsets(incomplete,test),truecolumn)
+        uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest,shape1d)
+        corrected, correctederr = ratioToComplete(incompletetest,completetest,shape1d,
+                                                  inverse = inverse)
+        completecounts = inRangeCounts(completetest,shape1d)
         results1d.append((name,uncorrected,uncorrectederr,corrected,correctederr,completecounts))
 
-    print("\nchoosing rcond within the calibration half (bivariate):")
+    print("\nchoosing rcond within the calibration rosettes (bivariate):")
     combinations2d = [
         ("ELG-centered",IM.sv3elgnofiberassign,IM.sv3elgfiberassign,"N_lrgCiC",
          "ELG counts","LRG counts"),
@@ -473,15 +552,18 @@ def run(swap = False):
     for entry in combinations2d:
         name, complete, incomplete, secondarycolumn, primarylabel, secondarylabel = entry
         inverse, calibrationinverses, rcond = calibrateBivariate(complete,incomplete,secondarycolumn,
-                                                                 calibration,bins,name)
+                                                                 calibration,name,
+                                                                 padding = padding,
+                                                                 rcondvalues = rcondvalues)
+        rconds[name+" (bivariate)"] = rcond
         completetables = rosetteSubsets(complete,test)
         incompletetables = rosetteSubsets(incomplete,test)
-        completetest = perRosetteHistograms2D(completetables,secondarycolumn,bins)
-        incompletetest = perRosetteHistograms2D(incompletetables,secondarycolumn,bins)
-        uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest,shape = shape2d)
-        corrected, correctederr = ratioToComplete(incompletetest,completetest,
-                                                  inverse = inverse,shape = shape2d)
-        completecounts = np.reshape(np.sum(completetest,axis = 0),shape2d)
+        completetest = perRosetteHistograms2D(completetables,secondarycolumn)
+        incompletetest = perRosetteHistograms2D(incompletetables,secondarycolumn)
+        uncorrected, uncorrectederr = ratioToComplete(incompletetest,completetest,shape2d)
+        corrected, correctederr = ratioToComplete(incompletetest,completetest,shape2d,
+                                                  inverse = inverse)
+        completecounts = inRangeCounts(completetest,shape2d)
         results2d.append((name,primarylabel,secondarylabel,uncorrected,corrected,
                           occupancyMask(completecounts)))
         summaries2d.append((name,uncorrected,uncorrectederr,corrected,correctederr,
@@ -489,7 +571,7 @@ def run(swap = False):
         resultsmoments.append((name,momentRatios(incompletetables,completetables,secondarycolumn,
                                                  inverse,calibrationinverses)))
 
-    print("\nhow far each ratio sits from 1 on the held-out half:")
+    print("\nhow far each ratio sits from 1 on %s:"%testname)
     for entry in results1d:
         summarize(*entry)
     for entry in summaries2d:
@@ -497,19 +579,28 @@ def run(swap = False):
         summarize(name+" (bivariate)",uncorrected,uncorrectederr,corrected,correctederr,
                   completecounts)
 
-    print("\nsimple moments of the bivariate distribution on the held-out half "
-          "(counts 0-%d only):"%MAXCOUNTS)
+    print("\nsimple moments of the bivariate distribution on %s "
+          "(counts 0-%d only):"%(testname,MAXCOUNTS))
     for entry in resultsmoments:
         summarizeMoments(*entry)
 
-    print()
-    plot1D(results1d,tag)
-    plot2D(results2d,tag)
-    plotMoments(resultsmoments,tag)
-    print("\nA working correction drives 'corrected / complete' to 1 where "
-          "'incomplete / complete' deviates. Blank bivariate cells are where the "
-          "complete catalog is empty, so the ratio is undefined rather than zero.")
+    figures = {}
+    if plots:
+        print()
+        figures['1d'] = plot1D(results1d,tag,description)
+        figures['2d'] = plot2D(results2d,tag,description)
+        figures['moments'] = plotMoments(resultsmoments,tag,description)
+        print("\nA working correction drives 'corrected / complete' to 1 where "
+              "'incomplete / complete' deviates. Blank bivariate cells are where the "
+              "complete catalog is empty, so the ratio is undefined rather than zero.")
+
+    return {'calibration': calibration,'test': test,'padding': padding,'tag': tag,
+            'rconds': rconds,'results1d': results1d,'summaries2d': summaries2d,
+            'moments': resultsmoments,'figures': figures}
 
 
 if __name__ == "__main__":
-    run(swap = "--swap" in sys.argv)
+    padding = 1.0
+    if "--padding" in sys.argv:
+        padding = float(sys.argv[sys.argv.index("--padding")+1])
+    run(swap = "--swap" in sys.argv,selftest = "--self" in sys.argv,padding = padding)

@@ -58,24 +58,90 @@ sv3lrgfiberassign_jack = [sv3lrgfiberassign[(sv3lrgfiberassign['rosette'] != i)]
 # Index 0 along each *observed* axis is the "never assigned a fiber" (-1) bin.
 # It is retained through normalization -- so rows do not sum to 1, and the
 # deficit is the fraction of targets that never got a fiber -- then dropped.
+#
+# The LAST state along every count axis, true and observed, is an OVERFLOW
+# state holding every count above maxcounts. Without it, an object whose true
+# count is above maxcounts but which is observed inside the range would appear
+# in the observed histogram while belonging to no row of the matrix, and the
+# inversion would wrongly attribute it to the in-range true bins (the error
+# starts in the top bin and is carried down through the inverse). With it,
+# every object belongs to some row, so the correction of the in-range bins is
+# exact up to padding and regularization.
+#
+# The overflow state exists ONLY so the in-range bins are corrected properly.
+# It must never be reported, plotted or used in a moment: histograms are built
+# with it (overflowHistogram), corrected, and then it is dropped (dropOverflow)
+# and the in-range bins are renormalized.
 #-----------------------------------------------------------------------------
+
+def overflowStates(values,maxcounts):
+    """Map counts to states 0..maxcounts+1; everything above maxcounts -> maxcounts+1.
+
+    Negative values (the -1 "no fiber" marker) are left as they are.
+    """
+    return np.minimum(np.asarray(values),maxcounts+1)
+
+
+def overflowHistogram(values,maxcounts):
+    """Histogram of counts 0..maxcounts plus a final overflow bin (length maxcounts+2)."""
+    bins = np.arange(-0.5,maxcounts+2)
+    return np.histogram(overflowStates(values,maxcounts),bins = bins)[0]
+
+
+def overflowHistogram2D(primaryvalues,secondaryvalues,maxcounts_primaries,maxcounts_secondaries):
+    """Bivariate overflowHistogram, primary on axis 0, flattened primary-slow."""
+    bins = [np.arange(-0.5,maxcounts_primaries+2),np.arange(-0.5,maxcounts_secondaries+2)]
+    return np.histogram2d(overflowStates(primaryvalues,maxcounts_primaries),
+                          overflowStates(secondaryvalues,maxcounts_secondaries),
+                          bins = bins)[0].ravel()
+
+
+def inRangeStates(C):
+    """Boolean mask over the flattened TRUE states of count matrix C, False for overflow.
+
+    Works for both countMatrix (2D C) and countMatrixBivariate (3D C); in the
+    bivariate case a state is overflow if either its primary or its secondary
+    count is.
+    """
+    if C.ndim == 2:
+        keep = np.ones(C.shape[0],dtype = bool)
+        keep[-1] = False
+        return keep
+    n_prim, n_sec = C.shape[1] - 1, C.shape[2] - 1
+    flat = np.arange(C.shape[0])
+    return (flat//n_sec < n_prim - 1) & (flat % n_sec < n_sec - 1)
+
+
+def dropOverflow(distribution,shape):
+    """Drop the overflow state(s) from a flattened distribution and renormalize.
+
+    shape is the full state grid including overflow: (maxcounts+2,) for 1D, or
+    (n_prim, n_sec) for bivariate. Returns an array of the in-range shape, i.e.
+    one smaller along every axis, normalized to unit sum.
+    """
+    grid = np.reshape(distribution,shape)
+    inrange = grid[tuple(slice(0,-1) for _ in shape)]
+    return inrange/np.sum(inrange)
+
 
 def countMatrix(CiCtable_complete,truecolumn,observedcolumn,maxcounts):
     """Unnormalized count matrix for a single (1D) count distribution.
 
-    Returns C with shape (maxcounts+1, maxcounts+2), where C[i] is the
-    histogram of observed counts for objects whose true count is i. Column 0
-    of C is the -1 "no fiber" bin; columns 1: are observed counts 0..maxcounts.
+    Returns C with shape (maxcounts+2, maxcounts+3), where C[i] is the
+    histogram of observed counts for objects whose true count is i. Row
+    maxcounts+1 is the overflow state (true count above maxcounts). Column 0 of
+    C is the -1 "no fiber" bin; columns 1: are observed counts 0..maxcounts and
+    then the observed overflow state.
 
     maxcounts must be supplied explicitly rather than taken from the data, so
     that jackknife subsamples all produce matrices of the same shape.
     """
-    bins = np.arange(-1,maxcounts+2)
-    C = np.zeros((maxcounts+1,maxcounts+2))
-    truevals = np.asarray(CiCtable_complete[truecolumn])
-    obsvals = np.asarray(CiCtable_complete[observedcolumn])
-    for i in np.arange(0,maxcounts+1):
-        hist, bins = np.histogram(obsvals[truevals == i],bins = bins)
+    bins = np.arange(-1.5,maxcounts+2)
+    C = np.zeros((maxcounts+2,maxcounts+3))
+    truevals = overflowStates(CiCtable_complete[truecolumn],maxcounts)
+    obsvals = overflowStates(CiCtable_complete[observedcolumn],maxcounts)
+    for i in np.arange(0,maxcounts+2):
+        hist, edges = np.histogram(obsvals[truevals == i],bins = bins)
         C[i] = hist
     return C
 
@@ -87,7 +153,8 @@ def countMatrixBivariate(CiCtable_complete,primarycolumn,secondarycolumn,maxcoun
     Returns C with shape (n_prim*n_sec, n_prim+1, n_sec+1), where
     C[i*n_sec + k] is the 2D histogram of observed (primary, secondary) counts
     for objects whose true joint state is (i, k), and n_prim/n_sec are
-    maxcounts_primaries+1 / maxcounts_secondaries+1.
+    maxcounts_primaries+2 / maxcounts_secondaries+2: counts 0..maxcounts and
+    then the overflow state, on each axis.
 
     The true joint state is flattened C-order with the PRIMARY as the slow
     axis: flat = i*n_sec + k == np.ravel_multi_index((i,k),(n_prim,n_sec)).
@@ -96,26 +163,26 @@ def countMatrixBivariate(CiCtable_complete,primarycolumn,secondarycolumn,maxcoun
 
     Index 0 along each observed axis is the -1 "no fiber" bin.
     """
-    n_prim = maxcounts_primaries + 1
-    n_sec = maxcounts_secondaries + 1
-    binsprim = np.arange(-1,maxcounts_primaries+2)
-    binssec = np.arange(-1,maxcounts_secondaries+2)
+    n_prim = maxcounts_primaries + 2
+    n_sec = maxcounts_secondaries + 2
+    binsprim = np.arange(-1.5,maxcounts_primaries+2)
+    binssec = np.arange(-1.5,maxcounts_secondaries+2)
 
     C = np.zeros((n_prim*n_sec,n_prim+1,n_sec+1))
-    trueprim = np.asarray(CiCtable_complete[primarycolumn])
-    truesec = np.asarray(CiCtable_complete[secondarycolumn])
-    obsprim = np.asarray(CiCtable_complete['inc_counts'])
-    obssec = np.asarray(CiCtable_complete['inc_counts_sec'])
+    trueprim = overflowStates(CiCtable_complete[primarycolumn],maxcounts_primaries)
+    truesec = overflowStates(CiCtable_complete[secondarycolumn],maxcounts_secondaries)
+    obsprim = overflowStates(CiCtable_complete['inc_counts'],maxcounts_primaries)
+    obssec = overflowStates(CiCtable_complete['inc_counts_sec'],maxcounts_secondaries)
     for i in np.arange(0,n_prim):
         for k in np.arange(0,n_sec):
             sel = (trueprim == i) & (truesec == k)
-            hist, binsprim, binssec = np.histogram2d(obsprim[sel],obssec[sel],bins = [binsprim,binssec])
+            hist, edgesprim, edgessec = np.histogram2d(obsprim[sel],obssec[sel],bins = [binsprim,binssec])
             C[i*n_sec + k] = hist
     return C
 
 
-def padDiagonal(C):
-    """Add one count to each true bin's own observed bin (`addextracount`).
+def padDiagonal(C,padding = 1.0):
+    """Add `padding` counts to each true bin's own observed bin (`addextracount`).
 
     ON BY DEFAULT. Empirically the inversion is unstable on the real SV3
     catalogs without it: a true bin whose observed distribution is sparse or
@@ -126,19 +193,23 @@ def padDiagonal(C):
 
     Apply this to a *summed* count matrix, never per-rosette: padding each of
     20 rosettes and then summing would pad the total 20 times over.
+
+    padding need not be an integer: it is a pseudo-count, so 0.5 adds half an
+    object to each diagonal cell and 0 turns the padding off. The overflow
+    state's diagonal cell is padded like any other.
     """
-    C = C.copy()
+    C = np.array(C,dtype = float)
     ntrue = C.shape[0]
-    C[np.arange(ntrue),np.arange(ntrue)+1] += 1
+    C[np.arange(ntrue),np.arange(ntrue)+1] += padding
     return C
 
 
-def padDiagonalBivariate(C,maxcounts_secondaries):
+def padDiagonalBivariate(C,maxcounts_secondaries,padding = 1.0):
     """Bivariate counterpart of padDiagonal: pads the (i,k)->(i,k) cell."""
-    C = C.copy()
-    n_sec = maxcounts_secondaries + 1
+    C = np.array(C,dtype = float)
+    n_sec = maxcounts_secondaries + 2
     flat = np.arange(C.shape[0])
-    C[flat,flat//n_sec + 1,flat % n_sec + 1] += 1
+    C[flat,flat//n_sec + 1,flat % n_sec + 1] += padding
     return C
 
 
@@ -197,24 +268,25 @@ def emptyTrueBins(C):
     return np.flatnonzero(np.sum(C,axis = axes) == 0)
 
 
-def makeNormalizer(addextracount = True):
+def makeNormalizer(addextracount = True,padding = 1.0):
     """Build the count-matrix -> M[true, observed] callable used by the jackknife.
 
     Returned as a closure so that padDiagonal is applied to each summed
-    jackknife replicate exactly once.
+    jackknife replicate exactly once. padding is the number of counts added to
+    each diagonal cell when addextracount is on.
     """
     def normalizer(C):
         if addextracount:
-            C = padDiagonal(C)
+            C = padDiagonal(C,padding)
         return normalizeCountMatrix(C)
     return normalizer
 
 
-def makeNormalizerBivariate(maxcounts_secondaries,addextracount = True):
+def makeNormalizerBivariate(maxcounts_secondaries,addextracount = True,padding = 1.0):
     """Bivariate counterpart of makeNormalizer."""
     def normalizer(C):
         if addextracount:
-            C = padDiagonalBivariate(C,maxcounts_secondaries)
+            C = padDiagonalBivariate(C,maxcounts_secondaries,padding)
         return normalizeCountMatrixBivariate(C)
     return normalizer
 
@@ -341,12 +413,15 @@ def rosetteList(*tables):
 def correctHistogram(C,h,normalizer,rcond):
     """Apply the correction implied by count matrix C to observed histogram h.
 
-    h is an unnormalized observed histogram; it is converted to a distribution
-    here so that jackknife replicates can be formed by subtracting raw counts.
-    The corrected distribution is renormalized to unit sum.
+    h is an unnormalized observed histogram INCLUDING the overflow state(s)
+    (overflowHistogram / overflowHistogram2D); it is converted to a
+    distribution here so that jackknife replicates can be formed by subtracting
+    raw counts. Returns the corrected distribution over the in-range states
+    only, flattened and renormalized to unit sum: the overflow state is used to
+    correct the in-range bins and then discarded.
     """
     forward, inv = regularizedInverse(normalizer(C),rcond)
-    corrected = inv @ (h/np.sum(h))
+    corrected = (inv @ (np.ravel(h)/np.sum(h)))[inRangeStates(C)]
     return corrected/np.sum(corrected)
 
 
@@ -433,7 +508,8 @@ def jackknifeMatricesBivariate(CiCtable_complete,secondarytracerCiC,maxcounts_pr
     Returns (rosettes, (matrices, inverses, full, fullinverse)), with matrices
     of shape (n_prim*n_sec, n_prim*n_sec) flattened primary-slow as documented
     in countMatrixBivariate. A corrected vector reshapes back to the 2D
-    distribution with reshape(maxcounts_primaries+1, maxcounts_secondaries+1).
+    distribution with reshape(maxcounts_primaries+2, maxcounts_secondaries+2),
+    whose last row and column are the overflow states (see dropOverflow).
     """
     if rosettes is None:
         rosettes = rosetteList(CiCtable_complete)
@@ -467,9 +543,8 @@ def scanRcond(CiCtable_complete,CiCtable_incomplete,truecolumn,observedcolumn,ma
     distance from truth, so this scan is the separate check on bias. Use the
     chosen value for every replicate.
     """
-    bins = np.arange(maxcounts+2)
-    complete, edges = np.histogram(np.asarray(CiCtable_complete[truecolumn]),bins = bins)
-    observed, edges = np.histogram(np.asarray(CiCtable_incomplete[truecolumn]),bins = bins)
+    complete = overflowHistogram(CiCtable_complete[truecolumn],maxcounts)
+    observed = overflowHistogram(CiCtable_incomplete[truecolumn],maxcounts)
 
     C = countMatrix(CiCtable_complete,truecolumn,observedcolumn,maxcounts)
     normalizer = makeNormalizer(addextracount = addextracount)
@@ -479,11 +554,13 @@ def scanRcond(CiCtable_complete,CiCtable_incomplete,truecolumn,observedcolumn,ma
 def rcondDeviations(C,observedhist,truehist,normalizer,rcondvalues):
     """RMS of corrected/true - 1 for each rcond. Works for 1D and flattened bivariate.
 
-    observedhist and truehist are unnormalized; both are converted to
-    distributions here. Bins where the truth is empty are skipped, since the
-    ratio is undefined there.
+    observedhist and truehist are unnormalized and include the overflow
+    state(s); both are converted to in-range distributions here, so the
+    overflow never enters the comparison. Bins where the truth is empty are
+    skipped, since the ratio is undefined there.
     """
-    truth = np.ravel(truehist)/np.sum(truehist)
+    truth = np.ravel(truehist)[inRangeStates(C)]
+    truth = truth/np.sum(truth)
     observed = np.ravel(observedhist)
     nonzero = truth > 0
     deviations = []
@@ -499,7 +576,8 @@ def rcondDeviations(C,observedhist,truehist,normalizer,rcondvalues):
 
 #CiCPlot uses a single binmax for all four 1D tracer combinations, so every
 #matrix has to be built on the same grid. binmax=6 in PlotCiC2.ipynb means
-#counts 0..5, hence maxcounts=5 and 6x6 (36x36 bivariate) matrices.
+#counts 0..5, hence maxcounts=5. With the overflow state the matrices are 7x7
+#(49x49 bivariate), but the corrected distributions are still over 0..5.
 MAXCOUNTS = 5
 RCONDVALUES = np.logspace(-15,-0.5,25)
 
@@ -564,7 +642,6 @@ def buildMatricesForCatalog(CiCtable_complete,CiCtable_incomplete,secondarytrace
     rosettecolumn = np.asarray(CiCtable_complete['rosette'])
     subsets = [CiCtable_complete[rosettecolumn == r] for r in rosettes]
 
-    bins = np.arange(maxcounts+2)
     normalizer1d = makeNormalizer(addextracount = addextracount)
     normalizerbiv = makeNormalizerBivariate(maxcounts,addextracount = addextracount)
 
@@ -573,11 +650,10 @@ def buildMatricesForCatalog(CiCtable_complete,CiCtable_incomplete,secondarytrace
     incompletesubsets = [CiCtable_incomplete[incompleterosette == r] for r in rosettes]
 
     def perrosette1d(tablelist,column):
-        return [np.histogram(np.asarray(t[column]),bins = bins)[0] for t in tablelist]
+        return [overflowHistogram(t[column],maxcounts) for t in tablelist]
 
     def perrosettebivariate(tablelist,column):
-        return [np.histogram2d(np.asarray(t["N_CiC"]),np.asarray(t[column]),
-                               bins = [bins,bins])[0].ravel() for t in tablelist]
+        return [overflowHistogram2D(t["N_CiC"],t[column],maxcounts,maxcounts) for t in tablelist]
 
     #primary: true N_CiC vs observed inc_counts
     Cprim = [countMatrix(s,"N_CiC",'inc_counts',maxcounts) for s in subsets]
@@ -600,7 +676,7 @@ def buildMatricesForCatalog(CiCtable_complete,CiCtable_incomplete,secondarytrace
         perrosettebivariate(subsets,secondarytracerCiC),
         normalizerbiv,rcondvalues,label = "bivariate")
 
-    return {'rosettes': np.asarray(rosettes),'maxcounts': maxcounts,
+    return {'rosettes': np.asarray(rosettes),'maxcounts': maxcounts,'overflow': True,
             'rcondvalues': np.asarray(rcondvalues),
             'rcond_prim': rcondprim,'rcond_sec': rcondsec,'rcond_biv': rcondbiv,
             'deviations_prim': devprim,'deviations_sec': devsec,'deviations_biv': devbiv,
@@ -628,9 +704,18 @@ def loadMatrices(elgfile = "datafiles/sv3incmatrix_elg.npz",
 
     Each entry is the (matrices, inverses, full, fullinverse) tuple that
     leaveOneOutMatrices produces, so it can also be unpacked directly.
+
+    The matrices include the overflow state (one more than the reported count
+    range along every axis). Files saved before the overflow state existed are
+    refused rather than misread: their shapes would be taken for a count range
+    one smaller with an overflow state.
     """
     elg = np.load(elgfile)
     lrg = np.load(lrgfile)
+    for filename, bundle in [(elgfile,elg),(lrgfile,lrg)]:
+        if 'overflow' not in bundle.files:
+            raise ValueError("%s was built without the overflow state; rebuild it with "
+                             "python IncompletenessMatrix.py"%filename)
     def entry(bundle,prefix):
         return (bundle[prefix+'_matrices'],bundle[prefix+'_inverses'],
                 bundle[prefix+'_full'],bundle[prefix+'_fullinverse'])
